@@ -117,6 +117,7 @@ const Runner = (() => {
     resize(); st = newState(); over = false; paused = false;
     $('#pauseOv').classList.add('hidden'); $('#resOv').classList.add('hidden');
     updHUD(); updProg();
+    { const h = $('#hint'); h.classList.remove('off'); clearTimeout(Runner._ht); Runner._ht = setTimeout(() => h.classList.add('off'), 5500); }
     if (!G.save.facts.crust) unlockFact('crust', true);
     running = true; last = performance.now(); cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
     window.addEventListener('resize', resize);
@@ -125,12 +126,18 @@ const Runner = (() => {
 
   function jump() {
     if (!running || paused || over) return;
-    if (st.onGround) { st.vy = -740; st.onGround = false; st.duck = 0; SFX.jump(); }
+    if (st.onGround) { $('#hint').classList.add('off'); st.vy = -740; st.onGround = false; st.duck = 0; SFX.jump(); }
   }
   function duck() {
     if (!running || paused || over) return;
     if (st.onGround) { if (st.duck <= 0) SFX.duck(); st.duck = 0.65; }
     else st.vy = Math.max(st.vy, 520);  // caer rápido
+  }
+  // mantener apretado: agachado mientras dure el toque
+  function duckHold(on) {
+    if (!running || paused || over) return;
+    st.holdDuck = on;
+    if (on) { if (st.onGround) { if (st.duck <= 0) SFX.duck(); st.duck = 0.12; } else st.vy = Math.max(st.vy, 520); }
   }
   function power() {
     if (!running || paused || over) return;
@@ -196,7 +203,7 @@ const Runner = (() => {
     // jugador
     if (!st.onGround) { st.vy += 1900 * dt; st.py += st.vy * dt; if (st.py >= 0) { st.py = 0; st.vy = 0; st.onGround = true; } }
     if (st.duck > 0) st.duck -= dt;
-    if (keys.ArrowDown || keys.s) { if (st.onGround) st.duck = Math.max(st.duck, 0.1); }
+    if (keys.ArrowDown || keys.s || st.holdDuck) { if (st.onGround) st.duck = Math.max(st.duck, 0.12); }
     if (st.inv > 0) st.inv -= dt; if (st.powerFx > 0) st.powerFx -= dt; if (st.hurtT > 0) st.hurtT -= dt;
     // caja del jugador
     const ducking = st.duck > 0 && st.onGround;
@@ -427,13 +434,31 @@ const Runner = (() => {
       el.addEventListener('pointerup', up); el.addEventListener('pointerleave', up); el.addEventListener('pointercancel', up);
       el.addEventListener('contextmenu', e => e.preventDefault());
     };
-    bind('#bJump', jump); bind('#bDuck', duck); bind('#bPower', power);
+    bind('#bPower', power);
+    // toque en la pantalla = saltar; mantener apretado = agacharse
+    const area = $('#rc'); let holdTimer = 0, holding = false, ptr = null;
+    area.addEventListener('pointerdown', e => {
+      e.preventDefault(); if (ptr !== null || paused || over) return;
+      ptr = e.pointerId; holding = false;
+      try { area.setPointerCapture(e.pointerId); } catch (x) {}
+      clearTimeout(holdTimer);
+      holdTimer = setTimeout(() => { holding = true; duckHold(true); }, 170);
+    });
+    const release = e => {
+      if (e.pointerId !== ptr) return;
+      ptr = null; clearTimeout(holdTimer);
+      if (holding) { holding = false; if (st) st.holdDuck = false; }
+      else if (e.type === 'pointerup') jump();
+    };
+    area.addEventListener('pointerup', release); area.addEventListener('pointercancel', release);
+    area.addEventListener('contextmenu', e => e.preventDefault());
     $('#bPause').onclick = () => setPaused(true);
     $('#bResume').onclick = () => setPaused(false);
     $('#bQuit').onclick = () => { setPaused(false); endRun(); };
     window.addEventListener('keydown', e => {
       if (current !== 'runner') return;
       keys[e.key] = true;
+      if (e.repeat) { if (e.key === 'ArrowDown' || e.key === 's') e.preventDefault(); return; }
       if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w') { e.preventDefault(); jump(); }
       else if (e.key === 'ArrowDown' || e.key === 's') { e.preventDefault(); duck(); }
       else if (e.key === 'x' || e.key === 'z' || e.key === 'Enter' || e.key === 'ArrowRight') { e.preventDefault(); power(); }
