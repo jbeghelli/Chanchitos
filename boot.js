@@ -1,14 +1,20 @@
 'use strict';
 (function boot() {
-  G.save = loadSave();
-  G.muted = !!G.save.muted;
-  if (G.save.faceURL) { const im = new Image(); im.onload = () => { G.faceImg = im; }; im.src = G.save.faceURL; }
+  G.all = loadAll();
+  G.muted = !!G.all.muted;
+  G.save = G.all.kids.find(k => k.id === G.all.cur) || null;   // se elige quién juega en la primera pantalla
+  G.save = null; loadFaceImg();
+  $('#bNewKid').onclick = () => { audio(); newKid(); };
+  $('#bOpts').onclick = openOpts;
+  $('#bOptClose').onclick = () => $('#optOv').classList.add('hidden');
+  $('#bResetAll').onclick = () => confirmBox('¿Borrar <b>TODO</b>? Se pierden todos los niños, sus fotos, mochilas, terrarios y progreso. No se puede deshacer.', 'SÍ, BORRAR TODO', () => { resetAll(); $('#optOv').classList.add('hidden'); openWho(); });
+  $('#hello').onclick = () => show('who');
   $('#bRun').onclick = () => { audio(); show('runner'); };
   $('#bTerr').onclick = () => { audio(); show('terr'); };
   $('#bFace').onclick = () => show('face');
   $('#bEnc').onclick = () => show('enc');
   $('#eBack').onclick = () => show('menu');
-  $('#bMute').onclick = () => { G.muted = !G.muted; G.save.muted = G.muted; persist(); if (G.muted && window.speechSynthesis) try { speechSynthesis.cancel(); } catch (e) {} else audio(); refreshMenu(); };
+  $('#bMute').onclick = () => { G.muted = !G.muted; persist(); if (G.muted && window.speechSynthesis) try { speechSynthesis.cancel(); } catch (e) {} else audio(); refreshMenu(); };
   // niño que respira en el menú
   const mk = $('#menukid'), mx = mk.getContext('2d');
   function menuLoop(t) {
@@ -27,9 +33,8 @@
   }
   requestAnimationFrame(menuLoop);
   for (const f of [initFaceUI, () => Runner.init(), () => Terr.init()]) { try { f(); } catch (e) { console.error(e); } }
-  show('menu');
+  show('who');
   // aviso de primera vez
-  if (!G.save.faceURL) $('#bFace').style.animation = 'pulse 1.3s ease-in-out infinite';
   window.G = G; window.Terr = Terr; window.Runner = Runner;
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
 })();

@@ -52,7 +52,7 @@ const Terr = (() => {
     buildDecor();
   }
   function serialize() {
-    if (!T) return;
+    if (!T || !G.save) return;
     G.save.colony = {
       t: T.t, moss: T.moss, lamp: false, vent: 0, heat: T.heat, nextHeat: T.nextHeat, nextId: T.nextId, born: T.born, lost: T.lost, mold: T.mold, temp: T.temp, light: T.light, over: 0,
       hum: Array.from(T.hum, v => Math.round(v * 10) / 10),
@@ -660,6 +660,8 @@ const Terr = (() => {
     saveT += dtR; if (saveT > 12) { saveT = 0; serialize(); }
     raf = requestAnimationFrame(loop);
   }
+  function reset() { if (T) serialize(); T = null; sel = null; parts = []; running = false; cancelAnimationFrame(raf); }
+  function discard() { T = null; sel = null; parts = []; running = false; cancelAnimationFrame(raf); }
   function start() {
     ensure();
     cv = $('#tc'); cx = cv.getContext('2d');
@@ -683,5 +685,5 @@ const Terr = (() => {
     document.addEventListener('visibilitychange', () => { if (document.hidden && T) serialize(); });
     window.addEventListener('pagehide', () => { if (T) serialize(); });
   }
-  return { init, start, stop, addRescued, get T() { return T; }, step(dt) { ensure(); stepEnv(dt, false); stepVitals(dt, false); stepMove(dt); }, ensure };
+  return { init, start, stop, reset, discard, addRescued, get T() { return T; }, step(dt) { ensure(); stepEnv(dt, false); stepVitals(dt, false); stepMove(dt); }, ensure };
 })();

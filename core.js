@@ -6,7 +6,6 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[(Math.random() * a.length) | 0];
 
-const SAVE_KEY = 'chanchitos_v2';
 const G = { save: null, faceImg: null, muted: false };
 
 function defaultSave() {
@@ -16,19 +15,85 @@ function defaultSave() {
     best: 0, facts: {}, colony: null, lastSeen: 0, runs: 0, rescued: 0, muted: false
   };
 }
-function loadSave() {
-  const d = defaultSave();
-  try {
-    const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-    if (s) { const r = Object.assign(d, s); r.inv = Object.assign({}, Object.fromEntries(Object.keys(d.inv).map(k => [k, 0])), s.inv || {}); return r; }
-    // versión anterior: solo se conserva nombre, foto y datos descubiertos
-    const o = JSON.parse(localStorage.getItem('chanchitos_v1'));
-    if (o) { d.name = o.name || ''; d.faceURL = o.faceURL || null; d.facts = o.facts || {}; d.muted = !!o.muted; }
-  } catch (e) {}
-  return d;
+/* ====== Varios niños: cada uno con su foto, mochila, terrario y progreso ====== */
+const ALL_KEY = 'chanchitos_v3';
+function normKid(k) {
+  const d = defaultSave(), r = Object.assign(d, k || {});
+  r.inv = k && k.inv ? Object.assign({}, Object.fromEntries(Object.keys(d.inv).map(x => [x, 0])), k.inv) : Object.assign({}, d.inv);
+  return r;
+}
+function loadAll() {
+  let all = null;
+  try { all = JSON.parse(localStorage.getItem(ALL_KEY)); } catch (e) {}
+  if (!all || !Array.isArray(all.kids)) {
+    all = { kids: [], cur: null, muted: false };
+    try {   // viene de una versión de un solo niño
+      const o2 = JSON.parse(localStorage.getItem('chanchitos_v2')), o1 = JSON.parse(localStorage.getItem('chanchitos_v1'));
+      const o = o2 || (o1 && { name: o1.name, faceURL: o1.faceURL, facts: o1.facts });
+      if (o) { const k = normKid(o); k.id = 'k' + Date.now(); if (!k.name) k.name = 'Niño 1'; all.kids.push(k); all.cur = k.id; all.muted = !!o.muted; }
+    } catch (e) {}
+  }
+  all.kids = all.kids.map(k => { const n = normKid(k); n.id = k.id || 'k' + Math.random().toString(36).slice(2); return n; });
+  return all;
 }
 function persist() {
-  try { G.save.lastSeen = Date.now(); localStorage.setItem(SAVE_KEY, JSON.stringify(G.save)); } catch (e) {}
+  try { if (G.save) G.save.lastSeen = Date.now(); G.all.muted = G.muted; localStorage.setItem(ALL_KEY, JSON.stringify(G.all)); } catch (e) {}
+}
+function loadFaceImg() {
+  G.faceImg = null;
+  if (G.save && G.save.faceURL) { const im = new Image(); im.onload = () => { G.faceImg = im; }; im.src = G.save.faceURL; }
+}
+function selectKid(id) {
+  const k = G.all.kids.find(k => k.id === id); if (!k) return;
+  Terr.reset(); G.save = k; G.all.cur = id; G.cp = null; G.pending = []; loadFaceImg(); persist(); show('menu');
+}
+function newKid() {
+  Terr.reset();
+  const k = normKid({}); k.id = 'k' + Date.now(); k.name = '';
+  G.all.kids.push(k); G.save = k; G.all.cur = k.id; G.cp = null; G.newKid = true; G.faceImg = null; persist(); show('face');
+}
+function deleteKid(id) {
+  const wasCur = G.save && G.save.id === id;
+  if (wasCur) { Terr.discard(); G.save = null; G.faceImg = null; }
+  G.all.kids = G.all.kids.filter(k => k.id !== id);
+  if (wasCur) G.all.cur = null;
+  persist();
+}
+function resetAll() {
+  Terr.discard(); G.save = null; G.faceImg = null; G.cp = null;
+  G.all = { kids: [], cur: null, muted: G.muted };
+  try { ['chanchitos_v1', 'chanchitos_v2', ALL_KEY].forEach(k => localStorage.removeItem(k)); } catch (e) {}
+  try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) {}
+}
+function confirmBox(msg, yesLabel, fn) {
+  $('#confMsg').innerHTML = msg; $('#confYes').textContent = yesLabel;
+  $('#confYes').onclick = () => { $('#confOv').classList.add('hidden'); fn(); };
+  $('#confNo').onclick = () => $('#confOv').classList.add('hidden');
+  $('#confOv').classList.remove('hidden');
+}
+function kidAvatar(k) {
+  return k.faceURL ? '<img src="' + k.faceURL + '" alt="">' : '<span>🧒</span>';
+}
+function openWho() {
+  const l = $('#kids'); l.innerHTML = '';
+  for (const k of G.all.kids) {
+    const b = document.createElement('button'); b.className = 'kid'; b.dataset.id = k.id;
+    const cnt = k.colony && k.colony.isos ? k.colony.isos.length : 0;
+    b.innerHTML = '<div class="av">' + kidAvatar(k) + '</div><div class="nm">' + (k.name || 'Sin nombre').replace(/</g, '&lt;') + '<small>⭐ Nivel ' + (k.level || 1) + ' · 🐛 ' + cnt + ' en el terrario · 🎒 ' + (k.inv.chans || 0) + '</small></div>';
+    b.onclick = () => { audio(); selectKid(k.id); };
+    l.appendChild(b);
+  }
+  if (!G.all.kids.length) { const p = document.createElement('p'); p.className = 'hint2'; p.textContent = 'Toca «Nuevo niño» para empezar.'; l.appendChild(p); }
+}
+function openOpts() {
+  const l = $('#optList'); l.innerHTML = '';
+  for (const k of G.all.kids) {
+    const b = document.createElement('button'); b.className = 'big gris'; b.style.fontSize = '17px';
+    b.textContent = '🗑 Borrar a ' + (k.name || 'Sin nombre');
+    b.onclick = () => confirmBox('¿Borrar a <b>' + (k.name || 'Sin nombre').replace(/</g, '&lt;') + '</b>? Se pierden su foto, su mochila, su terrario y su progreso.', 'SÍ, BORRAR', () => { deleteKid(k.id); openWho(); openOpts(); });
+    l.appendChild(b);
+  }
+  $('#optOv').classList.remove('hidden');
 }
 
 /* ====== Sonido (sintetizado, sin archivos) ====== */
@@ -134,8 +199,8 @@ function toast(f, isNew) {
 function say(text, ic) { toast({ ic: ic || '🐛', t: text, x: '' }, false); }
 
 /* ====== Navegación ====== */
-const SCREENS = ['menu', 'runner', 'terr', 'face', 'enc'];
-let current = 'menu';
+const SCREENS = ['who', 'menu', 'runner', 'terr', 'face', 'enc'];
+let current = 'who';
 function show(name) {
   const prev = current;
   if (prev === 'runner' && name !== 'runner') Runner.stop();
@@ -143,6 +208,7 @@ function show(name) {
   current = name;
   SCREENS.forEach(s => $('#' + s).classList.toggle('hidden', s !== name));
   $('#toast').innerHTML = ''; $('#toast').dataset.scr = name; G.pending = [];
+  if (name === 'who') openWho();
   if (name === 'menu') refreshMenu();
   if (name === 'runner') Runner.start();
   if (name === 'terr') Terr.start();
@@ -152,8 +218,9 @@ function show(name) {
 }
 
 function refreshMenu() {
-  const n = G.save.name;
-  const h = $('#hello'); h.classList.toggle('hidden', !n); h.textContent = '¡Hola, ' + n + '! 👋';
+  const n = G.save.name || '';
+  $('#hello').textContent = '👋 ¡Hola, ' + n + '!  ·  cambiar de niño';
+  $('#bFace').style.animation = G.save.faceURL ? '' : 'pulse 1.3s ease-in-out infinite';
   const c = G.save.colony ? G.save.colony.isos.length : 0;
   $('#colSub').textContent = c ? c + ' chanchitos en tu colonia' : 'cuida tu colonia';
   $('#encSub').textContent = factsUnlockedCount() + ' de ' + FACTS.length + ' datos descubiertos';
@@ -256,10 +323,9 @@ function initFaceUI() {
   $('#fileCam').onchange = e => { loadFaceFile(e.target.files[0]); e.target.value = ''; };
   $('#fileGal').onchange = e => { loadFaceFile(e.target.files[0]); e.target.value = ''; };
   $('#bFaceOk').onclick = () => {
-    G.save.name = $('#nameIn').value.trim();
+    G.save.name = $('#nameIn').value.trim() || 'Niño ' + G.all.kids.length;
     if (Face.img) setFaceURL(exportFace());
-    $('#bFace').style.animation = G.save.faceURL ? '' : 'pulse 1.3s ease-in-out infinite';
-    persist(); SFX.win(); show('menu');
+    G.newKid = false; persist(); SFX.win(); show('menu');
   };
   $('#bFaceClear').onclick = () => { Face.img = null; setFaceURL(null); drawFace(); };
 }
