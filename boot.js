@@ -3,7 +3,6 @@
   G.save = loadSave();
   G.muted = !!G.save.muted;
   if (G.save.faceURL) { const im = new Image(); im.onload = () => { G.faceImg = im; }; im.src = G.save.faceURL; }
-  initFaceUI(); Runner.init(); Terr.init();
   $('#bRun').onclick = () => { audio(); show('runner'); };
   $('#bTerr').onclick = () => { audio(); show('terr'); };
   $('#bFace').onclick = () => show('face');
@@ -27,6 +26,7 @@
     requestAnimationFrame(menuLoop);
   }
   requestAnimationFrame(menuLoop);
+  for (const f of [initFaceUI, () => Runner.init(), () => Terr.init()]) { try { f(); } catch (e) { console.error(e); } }
   show('menu');
   // aviso de primera vez
   if (!G.save.faceURL) $('#bFace').style.animation = 'pulse 1.3s ease-in-out infinite';
