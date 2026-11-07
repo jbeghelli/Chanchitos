@@ -82,6 +82,10 @@ function drawBall(ctx, x, y, r, rot, white) {
 
 const Runner = (() => {
   const LW = 400;
+  const goalOf = lv => Math.min(30, 10 + 2 * (lv - 1));
+  const GIFTS = ['hoja', 'hoja', 'verdura', 'calcio', 'corteza', 'rama', 'palito', 'piedra', 'pina'];
+  const GIFT_ICON = { hoja: '🍃', verdura: '🥕', calcio: '🦴', corteza: '🪵', rama: '🌿', palito: '🥢', piedra: '🪨', pina: '🌰' };
+  const GIFT_NAME = { hoja: 'Hoja', verdura: 'Zanahoria', calcio: 'Calcio', corteza: 'Corteza', rama: 'Rama', palito: 'Palito', piedra: 'Piedra', pina: 'Piña' };
   let cv, cx, W, H, S, LH, VW = 400, groundY;
   let raf = 0, last = 0, running = false, paused = false, over = false;
   let st;           // estado de la carrera
@@ -101,10 +105,10 @@ const Runner = (() => {
 
   function newState() {
     return {
-      t: 0, dist: 0, speed: 175, hearts: 3, count: 0, charge: 1, prog: 0,
+      t: 0, dist: 0, speed: 170, hearts: 3, count: 0, charge: 1, prog: 0, level: 1, lvCount: 0, biomeT: 1, banner: { txt: '🌳 NIVEL 1', t: 2.2 }, chansWon: 0,
       py: 0, vy: 0, onGround: true, duck: 0, inv: 0, powerFx: 0, shot: 0,
       obs: [], picks: [], proj: [], parts: [], pops: [], spawn: 1.2,
-      gain: { hoja: 0, verdura: 0, calcio: 0, corteza: 0 }, seen: {}, ended: false, hurtT: 0
+      gain: { hoja: 0, verdura: 0, calcio: 0, corteza: 0, rama: 0, palito: 0, piedra: 0, pina: 0 }, seen: {}, ended: false, hurtT: 0
     };
   }
 
@@ -112,7 +116,7 @@ const Runner = (() => {
     cv = $('#rc'); cx = cv.getContext('2d');
     resize(); st = newState(); over = false; paused = false;
     $('#pauseOv').classList.add('hidden'); $('#resOv').classList.add('hidden');
-    updHUD();
+    updHUD(); updProg();
     if (!G.save.facts.crust) unlockFact('crust', true);
     running = true; last = performance.now(); cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);
     window.addEventListener('resize', resize);
@@ -143,7 +147,7 @@ const Runner = (() => {
   const arc = (h) => (i, n) => -Math.sin((i + 0.5) / n * Math.PI) * h;
   function spawnPattern() {
     const x0 = VW + 60, g = groundY;
-    const lvl = st.dist / 450;
+    const lvl = (st.level - 1) / 2;
     const r = Math.random();
     if (r < 0.22) { // piedra + arco de chanchitos
       st.obs.push({ k: 'rock', x: x0 + 60, y: g, w: 40, h: 30 });
@@ -160,7 +164,7 @@ const Runner = (() => {
     } else if (r < 0.88) { // pura carrera de chanchitos
       chans(x0, g - 14, 7, 26, 0);
     } else if (r < 0.95 || lvl < 0.3) { // regalo
-      const kk = pick(['hoja', 'hoja', 'verdura', 'calcio', 'corteza']);
+      const kk = pick(GIFTS);
       st.picks.push({ k: kk, x: x0 + 30, y: g - 44, r: 16, rot: 0 });
       chans(x0 + 80, g - 14, 3, 26, 0);
     } else if (lvl >= 0.8) { // combinado
@@ -187,7 +191,7 @@ const Runner = (() => {
 
   function update(dt) {
     st.t += dt;
-    st.speed = Math.min(300, 175 + st.dist * 0.12);
+    st.speed = lerp(st.speed, Math.min(290, 170 + (st.level - 1) * 14), Math.min(1, dt * 0.6));
     st.dist += st.speed * dt / 40;
     // jugador
     if (!st.onGround) { st.vy += 1900 * dt; st.py += st.vy * dt; if (st.py >= 0) { st.py = 0; st.vy = 0; st.onGround = true; } }
@@ -243,24 +247,36 @@ const Runner = (() => {
     for (const q of st.pops) { q.y -= 30 * dt; q.life -= dt; }
     st.pops = st.pops.filter(q => q.life > 0);
     if (pwFlash > 0) pwFlash -= dt;
-    $('#rDist').textContent = Math.floor(st.dist) + ' m';
+    if (st.banner) { st.banner.t -= dt; if (st.banner.t <= 0) st.banner = null; }
+    if (st.biomeT < 1) st.biomeT = Math.min(1, st.biomeT + dt / 1.8);
   }
 
   function collect(p) {
     if (p.k === 'c') {
-      st.count++; st.prog++; SFX.pick(); puff(p.x, p.y, '#bcd', 5);
+      st.count++; st.prog++; st.lvCount++; SFX.pick(); puff(p.x, p.y, '#bcd', 5);
       if (st.count === 1) unlockFact('ball');
+      if (st.lvCount >= goalOf(st.level)) levelUp();
       if (st.prog >= 5) { st.prog = 0; if (st.charge < 3) { st.charge++; pop(106, groundY + st.py - 80, '+1 💧'); SFX.food(); } }
-      $('#rCount').textContent = '🐛 ' + st.count;
-      updHUD();
+      updProg(); updHUD();
     } else {
       st.gain[p.k]++; SFX.food();
-      const nm = { hoja: '🍃 Hoja', verdura: '🥕 Zanahoria', calcio: '🦴 Calcio', corteza: '🪵 Corteza' }[p.k];
-      pop(106, groundY + st.py - 80, '+' + nm);
-      if (p.k === 'hoja') unlockFact('decomp'); else if (p.k === 'verdura') unlockFact('veg'); else if (p.k === 'calcio') unlockFact('calcium'); else unlockFact('home');
+      pop(106, groundY + st.py - 80, '+' + GIFT_ICON[p.k] + ' ' + GIFT_NAME[p.k]);
+      if (p.k === 'hoja') unlockFact('decomp'); else if (p.k === 'verdura') unlockFact('veg'); else if (p.k === 'calcio') unlockFact('calcium'); else if (p.k === 'corteza') unlockFact('home'); else unlockFact('group');
     }
   }
 
+  function updProg() {
+    $('#rDist').textContent = '⭐ Nivel ' + st.level;
+    $('#rCount').textContent = '🐛 ' + st.lvCount + '/' + goalOf(st.level);
+  }
+  function levelUp() {
+    st.lvCount = 0; st.level++; st.biomeT = 0; st.chansWon++;
+    const inv = G.save.inv; inv.chans = (inv.chans || 0) + 1; persist();
+    SFX.win(); puff(106, groundY + st.py - 40, '#ffe27a', 16);
+    st.banner = { txt: (['🌳', '🌲', '🌙'][(st.level - 1) % 3]) + ' NIVEL ' + st.level, sub: '¡Ganaste un chanchito para tu mochila! 🎒', t: 3 };
+    pop(106, groundY + st.py - 90, '+1 🐛');
+    if (st.level === 2) unlockFact('home', true);
+  }
   function updHUD() {
     $('#hearts').textContent = '❤️'.repeat(Math.max(0, st.hearts)) + '🖤'.repeat(Math.max(0, 3 - st.hearts));
     let h = ''; for (let i = 0; i < 3; i++) h += '<i class="' + (i < st.charge ? 'on' : '') + '"></i>';
@@ -272,10 +288,9 @@ const Runner = (() => {
   function endRun() {
     if (over) return; over = true; st.ended = true;
     // las recompensas pasan a la colonia / inventario
-    Terr.addRescued(st.count);
     const inv = G.save.inv; for (const k in st.gain) inv[k] = (inv[k] || 0) + st.gain[k];
-    const meters = Math.floor(st.dist);
-    const newBest = meters > G.save.best; if (newBest) G.save.best = meters;
+    const lvl = st.level, meters = Math.floor(st.dist);
+    const newBest = lvl > G.save.best; if (newBest) G.save.best = lvl;
     G.save.runs++; G.save.rescued += st.count; persist();
     SFX.win(); $('#toast').innerHTML = '';
     const pend = (G.pending || []).slice(0, 1).map(id => FACT_BY_ID[id]);
@@ -283,10 +298,10 @@ const Runner = (() => {
     const f = fs[0];
     const nm = G.save.name ? G.save.name + ', ' : '';
     $('#resCard').innerHTML =
-      '<h2>' + (st.count ? '¡Bien hecho, ' + nm.replace(', ', '') + '!' : '¡Buen intento!') + '</h2>' +
-      '<div class="stats"><div>🐛 ' + st.count + '<small>rescatados</small></div><div>🏃 ' + meters + '<small>metros</small></div><div>⭐ ' + G.save.best + '<small>récord' + (newBest ? ' nuevo' : '') + '</small></div></div>' +
-      '<p>' + (st.count ? 'Tus ' + st.count + ' chanchitos ya están en tu terrario 🏡' : 'Salta, agáchate y usa el poder para rescatar chanchitos.') +
-      (Object.values(st.gain).some(v => v) ? '<br>Ganaste: ' + [['hoja', '🍃'], ['verdura', '🥕'], ['calcio', '🦴'], ['corteza', '🪵']].filter(a => st.gain[a[0]]).map(a => a[1] + '×' + st.gain[a[0]]).join(' ') : '') + '</p>' +
+      '<h2>' + (st.chansWon ? '¡Bien hecho, ' + nm.replace(', ', '') + '!' : '¡Buen intento!') + '</h2>' +
+      '<div class="stats"><div>⭐ ' + lvl + '<small>nivel</small></div><div>🎒 ' + (G.save.inv.chans || 0) + '<small>chanchitos en tu mochila</small></div><div>🏆 ' + G.save.best + '<small>récord' + (newBest ? ' nuevo' : '') + '</small></div></div>' +
+      '<p>' + (st.chansWon ? 'Ganaste ' + st.chansWon + ' chanchito' + (st.chansWon > 1 ? 's' : '') + ' por pasar de nivel. ¡Ponlos en tu terrario! 🏡' : 'Junta ' + goalOf(1) + ' chanchitos para pasar de nivel y ganar uno para tu terrario.') +
+      (Object.values(st.gain).some(v => v) ? '<br>Encontraste: ' + Object.keys(st.gain).filter(k => st.gain[k]).map(k => GIFT_ICON[k] + '×' + st.gain[k]).join(' ') : '') + '</p>' +
       fs.map((ff, i) => '<div class="factbox"><span class="ic">' + ff.ic + '</span><div><b>' + (pend.length ? '📖 ¡Dato nuevo! ' : '') + ff.t + '</b>' + ff.x + '</div><button class="round resSay" data-i="' + i + '">🔊</button></div>').join('') +
       '<button class="big azul" id="resTerr">🏡 IR AL TERRARIO</button><button class="big verde" id="resAgain">🏃 CORRER OTRA VEZ</button><button class="big gris" id="resMenu">MENÚ</button>';
     document.querySelectorAll('.resSay').forEach(b => b.onclick = () => { const ff = fs[+b.dataset.i]; speak(ff.t + '. ' + ff.x); });
@@ -303,12 +318,12 @@ const Runner = (() => {
 
   function draw() {
     cx.setTransform(S, 0, 0, S, 0, 0);
-    const b = biomeAt(st.dist), nb = BIOMES[Math.min(BIOMES.length - 1, BIOMES.indexOf(b) + 1)];
-    const tt = b === nb ? 0 : clamp((st.dist - (nb.start - 60)) / 60, 0, 1);
+    const nb = BIOMES[(st.level - 1) % BIOMES.length], b = BIOMES[(st.level + BIOMES.length - 2) % BIOMES.length];
+    const tt = st.level === 1 ? 1 : st.biomeT;
     const sky = cx.createLinearGradient(0, 0, 0, groundY);
     sky.addColorStop(0, mix(b.sky[0], nb.sky[0], tt)); sky.addColorStop(1, mix(b.sky[1], nb.sky[1], tt));
     cx.fillStyle = sky; cx.fillRect(0, 0, VW, LH);
-    const night = b.name === 'Noche' || tt > 0.5 && nb.name === 'Noche';
+    const night = tt > 0.5 ? nb.name === 'Noche' : b.name === 'Noche' && st.level > 1;
     // sol / luna
     cx.fillStyle = night ? '#f4f1d8' : '#fff3a0'; cx.beginPath(); cx.arc(390, groundY * 0.28, 26, 0, 7); cx.fill();
     if (night) { cx.fillStyle = 'rgba(255,255,255,.8)'; for (let i = 0; i < 24; i++) { cx.fillRect((i * 97 + 31) % VW, (i * 53) % (groundY * 0.7), 2, 2); } }
@@ -348,13 +363,12 @@ const Runner = (() => {
     cx.font = '900 18px ui-rounded,Arial Rounded MT Bold,sans-serif'; cx.textAlign = 'center'; cx.lineWidth = 4;
     for (const q of st.pops) { cx.globalAlpha = clamp(q.life * 2, 0, 1); cx.strokeStyle = '#1d1a16'; cx.strokeText(q.txt, q.x, q.y); cx.fillStyle = '#fff'; cx.fillText(q.txt, q.x, q.y); } cx.globalAlpha = 1;
     // aviso de bioma
-    if (st.dist < 3) { bigText('🌳 JARDÍN'); }
-    for (let i = 1; i < BIOMES.length; i++) { const d = st.dist - BIOMES[i].start; if (d >= 0 && d < 4) bigText((i === 1 ? '🌲 ' : '🌙 ') + BIOMES[i].name.toUpperCase()); }
-    if (st.dist < 4 && st.t > 0.3) { cx.fillStyle = 'rgba(0,0,0,.45)'; }
+    if (st.banner) { cx.globalAlpha = clamp(st.banner.t * 1.5, 0, 1); bigText(st.banner.txt, st.banner.sub); cx.globalAlpha = 1; }
   }
-  function bigText(t) {
+  function bigText(t, sub) {
     cx.font = '900 34px ui-rounded,Arial Rounded MT Bold,sans-serif'; cx.textAlign = 'center'; cx.lineWidth = 6; cx.strokeStyle = '#1d1a16';
     cx.strokeText(t, VW / 2, groundY * 0.4); cx.fillStyle = '#ffe27a'; cx.fillText(t, VW / 2, groundY * 0.4);
+    if (sub) { cx.font = '800 16px ui-rounded,Arial Rounded MT Bold,sans-serif'; cx.lineWidth = 4; cx.strokeText(sub, VW / 2, groundY * 0.4 + 28); cx.fillStyle = '#fff'; cx.fillText(sub, VW / 2, groundY * 0.4 + 28); }
   }
 
   function drawObs(o) {
@@ -389,7 +403,7 @@ const Runner = (() => {
   function drawPick(p) {
     if (p.k === 'c') { drawBall(cx, p.x, p.y + Math.sin(st.t * 6 + p.x * 0.05) * 1.5, 11, p.rot); return; }
     cx.font = '30px sans-serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
-    const e = { hoja: '🍃', verdura: '🥕', calcio: '🦴', corteza: '🪵' }[p.k];
+    const e = GIFT_ICON[p.k];
     cx.fillStyle = 'rgba(255,255,255,.55)'; cx.beginPath(); cx.arc(p.x, p.y, 20, 0, 7); cx.fill();
     cx.fillStyle = '#000'; cx.fillText(e, p.x, p.y + 2 + Math.sin(st.t * 5) * 3); cx.textBaseline = 'alphabetic';
   }

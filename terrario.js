@@ -39,13 +39,7 @@ const Terr = (() => {
       nextId: 1, born: 0, lost: 0, mold: 0, temp: 22, light: 0, over: 0
     };
     for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) T.hum[j * GW + i] = lerp(78, 42, i / (GW - 1)) + rnd(-5, 5);
-    T.items.push({ id: T.nextId++, k: 'corteza', x: 90, y: 200, amt: 100, age: 0, mold: 0 });
-    T.items.push({ id: T.nextId++, k: 'corteza', x: 250, y: 430, amt: 100, age: 0, mold: 0 });
-    T.items.push({ id: T.nextId++, k: 'hoja', x: 120, y: 330, amt: 100, age: 0, mold: 0 });
-    T.items.push({ id: T.nextId++, k: 'calcio', x: 230, y: 160, amt: 100, age: 0, mold: 0 });
-    // regalo inicial: 2 hembras y 2 machos jóvenes
-    ['F', 'M', 'F', 'M'].forEach(s => T.isos.push(newIso({ sex: s, age: rnd(10, 14) })));
-    T.isos.forEach(i => { i.molt = rnd(0, 0.6); });
+    // el terrario empieza vacío: el niño lo construye de a poco con su mochila
   }
   function ensure() {
     if (T) return;
@@ -93,7 +87,9 @@ const Terr = (() => {
   const humAt = (x, y) => T.hum[cell(x, y)];
   function ambient(p) { return p < 0.06 ? p / 0.06 : p < 0.52 ? 1 : p < 0.62 ? 1 - (p - 0.52) / 0.10 : 0; }
   const barks = () => T.items.filter(i => i.k === 'corteza');
-  const capacity = () => Math.min(CAP_MAX, CAP_BASE + CAP_BARK * barks().length);
+  const DECOR = ['rama', 'palito', 'piedra', 'pina'];
+  const decors = () => T.items.filter(i => DECOR.includes(i.k));
+  const capacity = () => Math.min(CAP_MAX, CAP_BASE + CAP_BARK * barks().length + decors().length);
   const stage = i => i.age < 2 ? 'manca' : i.age < 10 ? 'joven' : 'adulto';
   const isoLen = i => lerp(8, 24, clamp(i.age / 12, 0, 1)) + (i.sex === 'F' ? 1.5 : 0);
   function spray(x, y, amt) {
@@ -202,8 +198,8 @@ const Terr = (() => {
           if (nb > 0) { SFX.baby(); unlockFact('marsupium'); setTimeout(() => unlockFact('baby'), 4000); parts.push({ x: s.x, y: s.y, t: 'heart', life: 1.2 }); say(s.name + ' tuvo ' + nb + ' cría' + (nb > 1 ? 's' : '') + ' 👶', '🎒'); }
         }
       } else if (s.cool > 0) s.cool -= dt;
-      else if (s.sex === 'F' && s.age >= 10 && males && !full && !off && s.hp > 70 && s.hyd > 60 && s.food > 55 && s.cal > 50 && T.temp > 17 && T.temp < 28 && Math.random() < 0.006 * dt) {
-        s.preg = 75; s.brood = 3 + ((s.cal / 25) | 0) + ((Math.random() * 3) | 0); unlockFact('broods');
+      else if (s.sex === 'F' && s.age >= 10 && males && !full && !off && s.hp > 70 && s.hyd > 60 && s.food > 55 && s.cal > 50 && T.temp > 17 && T.temp < 28 && Math.random() < 0.004 * dt) {
+        s.preg = 75; s.brood = 1 + ((s.cal / 40) | 0) + ((Math.random() * 2) | 0); unlockFact('broods');
       }
     }
   }
@@ -254,6 +250,10 @@ const Terr = (() => {
       for (const o of T.isos) if (o !== s && !o.hid) { const d = Math.hypot(o.x - s.x, o.y - s.y); if (d < cd && d > 10) { cd = d; c = o; } }
       if (c) { s.mode = 'group'; s.tx = c.x; s.ty = c.y; return; }
     }
+    if (Math.random() < 0.4) {
+      const ds = T.items.filter(i => DECOR.includes(i.k) || i.k === 'corteza');
+      if (ds.length) { const d = pick(ds); s.mode = 'wander'; s.tx = d.x + rnd(-12, 12); s.ty = d.y + rnd(-12, 12); return; }
+    }
     s.mode = 'wander'; const a = rnd(0, 6.28), r = rnd(30, 90); s.tx = clamp(s.x + Math.cos(a) * r, MINX, MAXX); s.ty = clamp(s.y + Math.sin(a) * r, MINY, MAXY);
   }
 
@@ -272,6 +272,7 @@ const Terr = (() => {
       let sp = 15 * (len / 20 + 0.4);
       sp *= h < 40 ? 1.7 : h > 70 ? 0.6 : 1;
       if (T.temp < 12) sp *= 0.3; if (T.temp > 30) sp *= 1.3;
+      for (const it of T.items) if ((DECOR.includes(it.k) || it.k === 'corteza') && Math.abs(it.x - s.x) < 16 && Math.abs(it.y - s.y) < 16) { touch++; break; }
       if (touch && s.mode !== 'seek' && s.mode !== 'flee') sp *= 0.25;
       if (T.light > 0.5 && !s.hid && s.mode === 'wander') sp *= 1.2;
       if (s.tx != null) {
@@ -374,7 +375,21 @@ const Terr = (() => {
     cx.save(); cx.translate(it.x, it.y);
     cx.strokeStyle = '#1d1a16'; cx.lineWidth = 1.6;
     const f = clamp(it.amt / 100, 0.25, 1);
-    if (it.k === 'hoja') {
+    if (it.k === 'rama') {
+      cx.rotate(it.id * 1.3); cx.strokeStyle = '#1d1a16'; cx.lineCap = 'round';
+      const br = (x0, y0, x1, y1, w) => { cx.lineWidth = w + 3; cx.strokeStyle = '#1d1a16'; cx.beginPath(); cx.moveTo(x0, y0); cx.lineTo(x1, y1); cx.stroke(); cx.lineWidth = w; cx.strokeStyle = '#7a5530'; cx.beginPath(); cx.moveTo(x0, y0); cx.lineTo(x1, y1); cx.stroke(); };
+      br(-34, 3, 32, -3, 7); br(-6, 1, 14, -22, 4); br(12, -2, 30, 16, 3.5); br(-22, 2, -32, -14, 3);
+    } else if (it.k === 'palito') {
+      cx.rotate(it.id * 2.1); cx.lineCap = 'round';
+      cx.lineWidth = 6; cx.strokeStyle = '#1d1a16'; cx.beginPath(); cx.moveTo(-15, 0); cx.lineTo(15, 2); cx.stroke();
+      cx.lineWidth = 3; cx.strokeStyle = '#a77a45'; cx.beginPath(); cx.moveTo(-15, 0); cx.lineTo(15, 2); cx.stroke();
+    } else if (it.k === 'piedra') {
+      cx.rotate(it.id); cx.fillStyle = '#9b9b9b'; cx.beginPath(); cx.moveTo(-14, 6); cx.quadraticCurveTo(-18, -10, -2, -12); cx.quadraticCurveTo(16, -12, 16, 4); cx.quadraticCurveTo(6, 13, -14, 6); cx.fill(); cx.stroke();
+      cx.fillStyle = 'rgba(255,255,255,.35)'; cx.beginPath(); cx.ellipse(-4, -5, 6, 3, -0.3, 0, 7); cx.fill();
+    } else if (it.k === 'pina') {
+      cx.rotate(it.id * 0.8); cx.fillStyle = '#7a4f2a'; cx.beginPath(); cx.ellipse(0, 0, 15, 9, 0, 0, 7); cx.fill(); cx.stroke();
+      cx.strokeStyle = '#4a2f18'; cx.lineWidth = 1.3; for (let i = -10; i <= 10; i += 5) { cx.beginPath(); cx.moveTo(i, -8); cx.quadraticCurveTo(i + 4, 0, i, 8); cx.stroke(); }
+    } else if (it.k === 'hoja') {
       cx.rotate(it.id * 1.7); cx.scale(f, f);
       cx.fillStyle = it.mold > 0.5 ? '#7d7a4a' : '#b9892b'; cx.beginPath(); cx.moveTo(-16, 0); cx.quadraticCurveTo(0, -14, 16, 0); cx.quadraticCurveTo(0, 12, -16, 0); cx.fill(); cx.stroke();
       cx.beginPath(); cx.moveTo(-16, 0); cx.lineTo(16, 0); cx.stroke();
@@ -470,7 +485,11 @@ const Terr = (() => {
     const n = T.isos.length;
     const avg = k => T.isos.reduce((a, i) => a + i[k], 0) / n;
     let ic = '😊', tx = '¡Tu colonia está feliz! Mira cómo se juntan y se esconden.';
-    if (!n) { ic = '🏃'; tx = 'El terrario está vacío. ¡Ve a correr y rescata chanchitos!'; }
+    if (!n) {
+      const c = G.save.inv.chans || 0;
+      if (c > 0) { ic = '🎒'; tx = 'Tienes ' + c + ' chanchito' + (c > 1 ? 's' : '') + ' en la mochila. Toca 🐛 abajo y luego la tierra para ponerlo. ¡Dale también una corteza 🪵 y una hoja 🍃!'; }
+      else { ic = '🏃'; tx = 'El terrario está vacío. Corre y pasa de nivel para ganar un chanchito.'; }
+    }
     else if (barks().length === 0) { ic = '🪵'; tx = 'No tienen dónde esconderse. Pon corteza 🪵 para que descansen de día.'; }
     else if (T.temp > 29) { ic = '🥵'; tx = 'Hace mucho calor. Apaga la luz 💡, ventila 🌬️ y rocía agua 💧.'; }
     else if (T.avgHum > 88) { ic = '🌊'; tx = '¡Hay demasiada agua! Ventila 🌬️ para que se seque un poco: mojado todo el tiempo causa moho.'; }
@@ -480,23 +499,32 @@ const Terr = (() => {
     else if (avg('cal') < 40 || T.isos.some(i => i.molt >= 1 && i.cal < 40)) { ic = '🦴'; tx = 'Necesitan calcio para su caparazón. Pon cáscara de huevo 🦴.'; }
     else if (T.mold > 0.6) { ic = '🍄'; tx = 'Hay moho en la comida vieja. Sácala con la esponja 🧽.'; }
     else if (T.isos.length >= capacity()) { ic = '🏠'; tx = 'El terrario está lleno. Pon más cortezas 🪵 o deja libres algunos en el jardín 🌳.'; }
+    else if ((G.save.inv.chans || 0) > 0 && T.isos.length < capacity()) { const c = G.save.inv.chans; ic = '🎒'; tx = 'Tienes ' + c + ' chanchito' + (c > 1 ? 's' : '') + ' esperando en la mochila 🐛. ¡Ponlo en la tierra!'; }
     else if (T.heat > 0) { ic = '🌡️'; tx = 'Es un día de calor. Vigila la humedad.'; }
     else if (T.isos.some(i => i.molting > 0)) { ic = '👕'; tx = 'Alguien está cambiando de piel. ¡No lo molestes!'; }
     else if (T.isos.some(i => i.preg > 0)) { ic = '🎒'; tx = 'Hay mamás con huevitos en su marsupio. ¡Pronto habrá bebés!'; }
     $('#advIc').textContent = ic; $('#advTx').textContent = tx;
   }
 
+  const SLOTS = [['chans', '🐛', 'tu chanchito'], ['hoja', '🍃', 'una hoja'], ['verdura', '🥕', 'verdura'], ['calcio', '🦴', 'calcio'], ['corteza', '🪵', 'una corteza'], ['rama', '🌿', 'una rama'], ['palito', '🥢', 'un palito'], ['piedra', '🪨', 'una piedra'], ['pina', '🌰', 'una piña']];
+  const ACTS = [['look', '🔍', 'Mirar'], ['spray', '💧', 'Rociar'], ['clean', '🧽', 'Sacar'], ['lamp', '💡', 'Luz'], ['vent', '🌬️', 'Ventilar'], ['say', '💬', 'Consejo']];
   function toolsUI() {
     const inv = G.save.inv;
-    const defs = [
-      ['look', '🔍', 'Mirar'], ['spray', '💧', 'Rociar'], ['hoja', '🍃', 'Hoja', 'hoja'], ['verdura', '🥕', 'Verdura', 'verdura'], ['calcio', '🦴', 'Calcio', 'calcio'],
-      ['corteza', '🪵', 'Corteza', 'corteza'], ['clean', '🧽', 'Sacar'], ['lamp', '💡', 'Luz'], ['vent', '🌬️', 'Ventilar'], ['say', '💬', 'Consejo']
-    ];
+    const hb = $('#hotbar'), keep = hb.scrollLeft; hb.innerHTML = '';
+    for (const d of SLOTS) {
+      const b = document.createElement('button'); b.className = 'slot'; b.dataset.t = d[0];
+      const n = inv[d[0]] || 0;
+      b.innerHTML = d[1] + '<small>' + n + '</small>';
+      if (!n) b.classList.add('zero');
+      if (tool === d[0]) b.classList.add('sel');
+      b.onclick = () => pickTool(d[0]);
+      hb.appendChild(b);
+    }
+    hb.scrollLeft = keep;
     const el = $('#tools'); el.innerHTML = '';
-    for (const d of defs) {
+    for (const d of ACTS) {
       const b = document.createElement('button'); b.className = 'tool'; b.dataset.t = d[0];
-      b.innerHTML = d[1] + '<small>' + d[2] + '</small>' + (d[3] ? '<span class="n">' + (inv[d[3]] || 0) + '</span>' : '');
-      if (d[3] && !(inv[d[3]] > 0)) b.classList.add('zero');
+      b.innerHTML = d[1] + '<small>' + d[2] + '</small>';
       if (tool === d[0]) b.classList.add('sel');
       if (d[0] === 'lamp' && T.lamp) b.classList.add('on');
       b.onclick = () => pickTool(d[0]);
@@ -510,6 +538,9 @@ const Terr = (() => {
     if (t === 'say') { speak($('#advTx').textContent); return; }
     tool = t; if (t !== 'look') { sel = null; $('#info').classList.add('hidden'); }
     if (t === 'spray') say('Toca o arrastra para rociar agua.', '💧');
+    const sl = SLOTS.find(s => s[0] === t);
+    if (sl) { const n = G.save.inv[t] || 0; say(n ? 'Elegiste ' + sl[2] + ' ' + sl[1] + '. Toca la tierra para ponerlo.' : 'No tienes ' + sl[2] + '. ¡Corre y pasa de nivel para ganar más!', sl[1]); }
+    if (t === 'clean') say('Toca algo para guardarlo en la mochila. Si es comida, se tira.', '🧽');
     toolsUI();
   }
 
@@ -535,21 +566,35 @@ const Terr = (() => {
       }
       return;
     }
-    if (tool === 'hoja' || tool === 'verdura' || tool === 'calcio' || tool === 'corteza') {
-      if (!(inv[tool] > 0)) { say('No tienes más. ¡Corre para ganar más!', '🏃'); return; }
+    if (tool === 'chans') {
+      if (!(inv.chans > 0)) { say('No tienes chanchitos en la mochila. ¡Corre y pasa de nivel para ganar uno!', '🏃'); return; }
+      if (T.isos.length >= capacity()) { say('El terrario está lleno. Pon más cortezas o decoración para que quepan más.', '🏠'); return; }
+      const sex = (G.save.sexN = (G.save.sexN || 0) + 1) % 2 === 1 ? 'F' : 'M';
+      const c = newIso({ sex, age: 9, x: clamp(p.x, MINX, MAXX), y: clamp(p.y, MINY, MAXY), hyd: 85, food: 70, cal: 70, molt: rnd(0.1, 0.6) });
+      T.isos.push(c); inv.chans--; parts.push({ x: c.x, y: c.y, t: 'star', life: 1 }); SFX.baby(); persist(); toolsUI();
+      say('¡' + c.name + ' llegó a su nuevo hogar! 🏡', '🐛'); unlockFact('crust'); unlockFact('home');
+      return;
+    }
+    if (['hoja', 'verdura', 'calcio', 'corteza', 'rama', 'palito', 'piedra', 'pina'].includes(tool)) {
+      if (!(inv[tool] > 0)) { say('No tienes más. ¡Corre y pasa de nivel para ganar más!', '🏃'); return; }
+      const food = ['hoja', 'verdura', 'calcio'].includes(tool);
       if (tool === 'corteza' && barks().length >= 6) { say('Ya hay mucha corteza, ¡cabe poco más!', '🪵'); return; }
-      if (T.items.filter(i => i.k !== 'corteza').length >= 14 && tool !== 'corteza') { say('Hay mucha comida. Deja que se la coman o sácala.', '🍃'); return; }
+      if (DECOR.includes(tool) && decors().length >= 12) { say('Ya hay mucha decoración. Saca algo con la esponja 🧽 para cambiarlo.', '🌿'); return; }
+      if (food && T.items.filter(i => ['hoja', 'verdura', 'calcio'].includes(i.k)).length >= 14) { say('Hay mucha comida. Deja que se la coman o sácala.', '🍃'); return; }
       inv[tool]--; T.items.push({ id: T.nextId++, k: tool, x: clamp(p.x, MINX, MAXX), y: clamp(p.y, MINY, MAXY), amt: 100, age: 0, mold: 0 });
       SFX.food(); persist(); toolsUI();
-      if (tool === 'calcio') unlockFact('calcium'); if (tool === 'corteza') unlockFact('nocturnal');
+      if (tool === 'calcio') unlockFact('calcium'); else if (tool === 'corteza') unlockFact('nocturnal'); else if (DECOR.includes(tool)) unlockFact('group');
       return;
     }
     if (tool === 'clean') {
+      let bi = null, bdi = 20;
+      for (const s of T.isos) { if (s.hid) continue; const d = Math.hypot(s.x - p.x, s.y - p.y); if (d < bdi) { bdi = d; bi = s; } }
+      if (bi) { T.isos = T.isos.filter(i => i !== bi); inv.chans = (inv.chans || 0) + 1; if (sel === bi) sel = null; SFX.pop(); say(bi.name + ' volvió a tu mochila 🎒', '🐛'); persist(); toolsUI(); return; }
       let best = null, bd = 34;
       for (const it of T.items) { const d = Math.hypot(it.x - p.x, it.y - p.y); if (d < bd) { bd = d; best = it; } }
       if (best) {
         T.items = T.items.filter(i => i !== best); SFX.pop();
-        if (best.k === 'corteza') { inv.corteza++; say('Recogiste la corteza. Puedes ponerla en otro lugar.', '🪵'); }
+        if (best.k === 'corteza' || DECOR.includes(best.k)) { inv[best.k] = (inv[best.k] || 0) + 1; say('Lo guardaste en la mochila. Puedes ponerlo en otro lugar.', '🎒'); }
         else if (best.mold > 0.3) { say('¡Bien! Sacaste comida con moho.', '🧽'); unlockFact('mold'); }
         persist(); toolsUI();
       }
@@ -621,7 +666,7 @@ const Terr = (() => {
     // ayuda para quien vuelve: avance suave del tiempo mientras no estaba
     const away = G.save.lastSeen ? Math.min(600, (Date.now() - G.save.lastSeen) / 1000) : 0;
     if (away > 30 && T.isos.length && !T.offlineDone) { for (let t = 0; t < away; t += 5) { stepEnv(5, true); stepVitals(5, true); } if (away > 120) say('Mientras no estabas, tus chanchitos se cuidaron solos un ratito 🐛', '🏡'); }
-    tool = 'look'; sel = null; speed = 1; parts = []; $('#info').classList.add('hidden');
+    tool = (G.save.inv.chans > 0 && !T.isos.length) ? 'chans' : 'look'; sel = null; speed = 1; parts = []; $('#info').classList.add('hidden');
     resize(); ro = new ResizeObserver(resize); ro.observe($('#twrap'));
     toolsUI(); hud(); advice();
     running = true; last = performance.now(); cancelAnimationFrame(raf); raf = requestAnimationFrame(loop);

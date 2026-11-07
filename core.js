@@ -6,19 +6,26 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const pick = a => a[(Math.random() * a.length) | 0];
 
-const SAVE_KEY = 'chanchitos_v1';
+const SAVE_KEY = 'chanchitos_v2';
 const G = { save: null, faceImg: null, muted: false };
 
 function defaultSave() {
   return {
     name: '', faceURL: null,
-    inv: { hoja: 6, verdura: 2, calcio: 2, corteza: 2 },
+    inv: { hoja: 6, verdura: 2, calcio: 2, corteza: 1, rama: 1, palito: 2, piedra: 1, pina: 1, chans: 2 }, sexN: 0,
     best: 0, facts: {}, colony: null, lastSeen: 0, runs: 0, rescued: 0, muted: false
   };
 }
 function loadSave() {
-  try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s) return Object.assign(defaultSave(), s); } catch (e) {}
-  return defaultSave();
+  const d = defaultSave();
+  try {
+    const s = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if (s) { const r = Object.assign(d, s); r.inv = Object.assign({}, Object.fromEntries(Object.keys(d.inv).map(k => [k, 0])), s.inv || {}); return r; }
+    // versión anterior: solo se conserva nombre, foto y datos descubiertos
+    const o = JSON.parse(localStorage.getItem('chanchitos_v1'));
+    if (o) { d.name = o.name || ''; d.faceURL = o.faceURL || null; d.facts = o.facts || {}; d.muted = !!o.muted; }
+  } catch (e) {}
+  return d;
 }
 function persist() {
   try { G.save.lastSeen = Date.now(); localStorage.setItem(SAVE_KEY, JSON.stringify(G.save)); } catch (e) {}

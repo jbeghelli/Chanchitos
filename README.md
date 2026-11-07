@@ -3,8 +3,8 @@
 Juego web para niños de 4 a 8 años sobre el chanchito de tierra (*Armadillidium vulgare*). Abre `index.html` (o publícalo con GitHub Pages: `/chanchitos/`). No necesita instalación ni internet.
 
 ## Dos partes
-1. **¡A correr!** — El niño avanza solo. Tres botones: **saltar**, **agacharse** y **poder** (bolita de agua). Los chanchitos se enrollan en bolita (¡como en la vida real!) y se recogen en su frasco. Cada 5 chanchitos se carga un poder. Obstáculos: piedras y suelo seco (saltar), pájaros (agacharse), arañas (poder o saltar). También hay hojas, zanahorias, cáscaras de huevo y cortezas para el terrario.
-2. **Mi terrario** (pantalla vertical) — Vista desde arriba. Toca para rociar agua, poner comida, calcio y corteza; enciende o apaga la luz; ventila; saca el moho. Toca un chanchito para ver cómo está (se hace bolita).
+1. **¡A correr!** — El niño avanza solo. Tres botones: **saltar**, **agacharse** y **poder** (bolita de agua). Se juntan chanchitos (en bolita, como en la vida real) para **pasar de nivel**: cada nivel pide juntar un poco más. **Al pasar de nivel se gana 1 chanchito** que va a la **mochila** (estilo Minecraft). Cada 5 chanchitos juntados se carga un poder. Obstáculos: piedras y suelo seco (saltar), pájaros (agacharse), arañas (poder o saltar). En el camino también hay hojas, zanahorias, cáscaras de huevo, cortezas, ramas, palitos, piedras y piñas.
+2. **Mi terrario** (pantalla vertical, vista desde arriba) — Empieza **vacío**. La mochila de abajo tiene casillas: elige un chanchito o un objeto y toca la tierra para ponerlo. Así se construye de a poco. La esponja 🧽 guarda de vuelta en la mochila los chanchitos, cortezas y adornos. También hay rociador, luz, ventilación y consejero. Toca un chanchito para ver cómo está (se hace bolita).
 
 ## Mi cara 📸
 En **Mi cara** se sube una foto (cámara o galería), se centra y se agranda, y pasa a ser la cara del personaje (estilo recortable con gorro que rebota). La foto **solo se guarda en el aparato** (localStorage), no se envía a ningún servidor.
