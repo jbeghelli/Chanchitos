@@ -12,7 +12,7 @@ const G = { save: null, faceImg: null, muted: false };
 function defaultSave() {
   return {
     name: '', faceURL: null,
-    inv: { hoja: 6, verdura: 2, calcio: 2, corteza: 1, rama: 1, palito: 2, piedra: 1, pina: 1, chans: 2 }, sexN: 0,
+    inv: { hoja: 6, verdura: 2, calcio: 2, corteza: 1, rama: 1, palito: 2, piedra: 1, pina: 1, chans: 2 }, sexN: 0, level: 1,
     best: 0, facts: {}, colony: null, lastSeen: 0, runs: 0, rescued: 0, muted: false
   };
 }
@@ -158,6 +158,7 @@ function refreshMenu() {
   $('#colSub').textContent = c ? c + ' chanchitos en tu colonia' : 'cuida tu colonia';
   $('#encSub').textContent = factsUnlockedCount() + ' de ' + FACTS.length + ' datos descubiertos';
   $('#bMute').textContent = G.muted ? '🔇' : '🔊';
+  $('#runSub').textContent = 'nivel ' + (G.save.level || 1) + ' · gana un chanchito al llegar a la meta';
 }
 
 /* ====== Chanciclopedia ====== */

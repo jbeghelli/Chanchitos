@@ -82,9 +82,10 @@ function drawBall(ctx, x, y, r, rot, white) {
 
 const Runner = (() => {
   const LW = 400;
-  const goalOf = lv => Math.min(30, 10 + 2 * (lv - 1));
+  const MAXLV = 12;
+  const lenOf = lv => Math.min(900, 400 + 100 * (lv - 1));   // metros de cada nivel
   const GIFTS = ['hoja', 'hoja', 'verdura', 'calcio', 'corteza', 'rama', 'palito', 'piedra', 'pina'];
-  const GIFT_ICON = { hoja: '🍃', verdura: '🥕', calcio: '🦴', corteza: '🪵', rama: '🌿', palito: '🥢', piedra: '🪨', pina: '🌰' };
+  const GIFT_ICON = { heart: '❤️', hoja: '🍃', verdura: '🥕', calcio: '🦴', corteza: '🪵', rama: '🌿', palito: '🥢', piedra: '🪨', pina: '🌰' };
   const GIFT_NAME = { hoja: 'Hoja', verdura: 'Zanahoria', calcio: 'Calcio', corteza: 'Corteza', rama: 'Rama', palito: 'Palito', piedra: 'Piedra', pina: 'Piña' };
   let cv, cx, W, H, S, LH, VW = 400, groundY;
   let raf = 0, last = 0, running = false, paused = false, over = false;
@@ -104,9 +105,12 @@ const Runner = (() => {
   }
 
   function newState() {
+    const level = Math.min(MAXLV, G.save.level || 1), len = lenOf(level);
+    const cp = G.cp && G.cp.level === level ? G.cp.dist : 0;
     return {
-      t: 0, dist: 0, speed: 170, hearts: 3, count: 0, charge: 1, prog: 0, level: 1, lvCount: 0, biomeT: 1, banner: { txt: '🌳 NIVEL 1', t: 2.2 }, chansWon: 0,
-      py: 0, vy: 0, onGround: true, duck: 0, inv: 0, powerFx: 0, shot: 0,
+      t: 0, dist: cp, len, speed: 170, hearts: 3, count: 0, charge: 1, prog: 0, level, cp, cpSet: !!cp, hearted: {}, flag: false, finishing: 0, won: false, stopSpawn: false,
+      banner: { txt: (['🌳', '🌲', '🌙'][(level - 1) % 3]) + ' NIVEL ' + level, sub: cp ? '🚩 Sigues desde la mitad' : '', t: 2.4 },
+      py: 0, vy: 0, onGround: true, duck: 0, inv: 0, powerFx: 0, shot: 0, holdDuck: false,
       obs: [], picks: [], proj: [], parts: [], pops: [], spawn: 1.2,
       gain: { hoja: 0, verdura: 0, calcio: 0, corteza: 0, rama: 0, palito: 0, piedra: 0, pina: 0 }, seen: {}, ended: false, hurtT: 0
     };
@@ -152,34 +156,34 @@ const Runner = (() => {
   /* --- Generador de obstáculos y tesoros --- */
   function chans(x, y, n, dx, dy) { for (let i = 0; i < n; i++) st.picks.push({ k: 'c', x: x + i * dx, y: y + (typeof dy === 'function' ? dy(i, n) : i * dy), r: 12, rot: rnd(0, 6) }); }
   const arc = (h) => (i, n) => -Math.sin((i + 0.5) / n * Math.PI) * h;
+  const pickW = list => { let t = 0; for (const [, w] of list) t += w; let r = Math.random() * t; for (const [k, w] of list) { if ((r -= w) < 0) return k; } return list[0][0]; };
   function spawnPattern() {
     const x0 = VW + 60, g = groundY;
-    const lvl = (st.level - 1) / 2;
-    const r = Math.random();
-    if (r < 0.22) { // piedra + arco de chanchitos
-      st.obs.push({ k: 'rock', x: x0 + 60, y: g, w: 40, h: 30 });
-      chans(x0 + 20, g - 30, 5, 24, arc(88));
-    } else if (r < 0.40) { // suelo seco y caliente
-      st.obs.push({ k: 'dry', x: x0 + 90, y: g, w: 110, h: 12 });
-      chans(x0 + 40, g - 26, 6, 26, arc(95));
-    } else if (r < 0.58) { // pájaro: agacharse
-      st.obs.push({ k: 'bird', x: x0 + 40, y: g - 52, w: 52, h: 30, ph: rnd(0, 6) });
-      chans(x0 - 10, g - 14, 6, 28, 0);
-    } else if (r < 0.76) { // araña: poder o saltar
-      st.obs.push({ k: 'spider', x: x0 + 20, y: g, w: 40, h: 26, ph: rnd(0, 6), hp: 1 });
-      chans(x0 + 120, g - 14, 4, 26, 0);
-    } else if (r < 0.88) { // pura carrera de chanchitos
-      chans(x0, g - 14, 7, 26, 0);
-    } else if (r < 0.95 || lvl < 0.3) { // regalo
-      const kk = pick(GIFTS);
-      st.picks.push({ k: kk, x: x0 + 30, y: g - 44, r: 16, rot: 0 });
-      chans(x0 + 80, g - 14, 3, 26, 0);
-    } else if (lvl >= 0.8) { // combinado
-      st.obs.push({ k: 'rock', x: x0 + 40, y: g, w: 40, h: 30 });
-      st.obs.push({ k: 'bird', x: x0 + 300, y: g - 52, w: 52, h: 30, ph: 0 });
-      chans(x0 + 190, g - 90, 3, 24, 0);
-    } else { chans(x0, g - 14, 5, 26, 0); }
-    const gapPx = rnd(300, 400) - Math.min(70, st.dist / 20);
+    const prog = clamp(st.dist / st.len, 0, 1);
+    const d = clamp(prog * 0.6 + Math.min(0.4, (st.level - 1) * 0.1), 0, 1);     // dificultad 0..1
+    const easy = st.level === 1 && prog < 0.1;                                       // comienzo tranquilo
+    const L = [['rock', 22], ['line', 12], ['gift', 7]];
+    if (!easy) {
+      L.push(['dry', 14], ['bird', 14 + d * 6], ['spider', 8 + d * 12]);
+      if (d > 0.25) L.push(['rock2', 8 + d * 8], ['spiderrock', 8 + d * 6]);
+      if (d > 0.4) L.push(['drybird', 10], ['birdspider', 8 + d * 6], ['trio', 6 + d * 6]);
+    }
+    // corazón extra en 25%, 50% y 75% del nivel
+    for (const q of [0.25, 0.5, 0.75]) if (prog >= q && !st.hearted[q] && st.hearts < 3) { st.hearted[q] = 1; st.picks.push({ k: 'heart', x: x0 + 20, y: g - 50, r: 16, rot: 0 }); }
+    const k = pickW(L);
+    if (k === 'rock') { st.obs.push({ k: 'rock', x: x0 + 60, y: g, w: 40, h: 30 }); chans(x0 + 20, g - 30, 5, 24, arc(88)); }
+    else if (k === 'dry') { st.obs.push({ k: 'dry', x: x0 + 70, y: g, w: 60, h: 12 }); chans(x0 + 28, g - 26, 5, 24, arc(95)); }
+    else if (k === 'bird') { st.obs.push({ k: 'bird', x: x0 + 40, y: g - 52, w: 52, h: 30, ph: rnd(0, 6) }); chans(x0 - 10, g - 14, 6, 28, 0); }
+    else if (k === 'spider') { st.obs.push({ k: 'spider', x: x0 + 20, y: g, w: 40, h: 26, ph: rnd(0, 6), hp: 1 }); chans(x0 + 120, g - 14, 4, 26, 0); }
+    else if (k === 'line') chans(x0, g - 14, 7, 26, 0);
+    else if (k === 'gift') { st.picks.push({ k: pick(GIFTS), x: x0 + 30, y: g - 44, r: 16, rot: 0 }); chans(x0 + 80, g - 14, 3, 26, 0); }
+    else if (k === 'rock2') { st.obs.push({ k: 'rock', x: x0 + 40, y: g, w: 40, h: 30 }, { k: 'rock', x: x0 + 270, y: g, w: 40, h: 30 }); chans(x0 + 10, g - 30, 4, 24, arc(80)); chans(x0 + 240, g - 30, 4, 24, arc(80)); }
+    else if (k === 'spiderrock') { st.obs.push({ k: 'spider', x: x0 + 20, y: g, w: 40, h: 26, ph: rnd(0, 6), hp: 1 }, { k: 'rock', x: x0 + 300, y: g, w: 40, h: 30 }); chans(x0 + 270, g - 30, 4, 24, arc(85)); }
+    else if (k === 'drybird') { st.obs.push({ k: 'dry', x: x0 + 40, y: g, w: 60, h: 12 }, { k: 'bird', x: x0 + 320, y: g - 52, w: 52, h: 30, ph: 0 }); chans(x0 + 270, g - 14, 4, 26, 0); }
+    else if (k === 'birdspider') { st.obs.push({ k: 'bird', x: x0 + 20, y: g - 52, w: 52, h: 30, ph: 1 }, { k: 'spider', x: x0 + 330, y: g, w: 40, h: 26, ph: 2, hp: 1 }); chans(x0 + 120, g - 14, 4, 26, 0); }
+    else if (k === 'trio') { st.obs.push({ k: 'rock', x: x0 + 30, y: g, w: 40, h: 30 }, { k: 'bird', x: x0 + 290, y: g - 52, w: 52, h: 30, ph: 0 }, { k: 'rock', x: x0 + 560, y: g, w: 40, h: 30 }); chans(x0 + 400, g - 14, 4, 26, 0); }
+    const reach = k === 'rock2' ? 300 : k === 'spiderrock' ? 340 : k === 'drybird' ? 360 : k === 'birdspider' ? 370 : k === 'trio' ? 600 : 0;
+    const gapPx = Math.max(240, rnd(290, 380) * (1 - 0.25 * d)) + reach;
     st.spawn = gapPx / st.speed;
   }
 
@@ -188,18 +192,26 @@ const Runner = (() => {
   function pop(x, y, txt) { st.pops.push({ x, y, txt, life: 0.9 }); }
 
   function hurt(why) {
-    if (st.inv > 0) return;
+    if (st.inv > 0 || st.finishing) return;
     st.hearts--; st.inv = 1.6; st.hurtT = 0.4; SFX.hurt();
     puff(100, groundY + st.py - 30, '#ff6b6b', 10);
     if (why === 'dry' && !st.seen.dry) { st.seen.dry = 1; unlockFact('moisture'); }
     updHUD();
-    if (st.hearts <= 0) endRun();
+    if (st.hearts <= 0) endRun(false);
   }
 
   function update(dt) {
     st.t += dt;
-    st.speed = lerp(st.speed, Math.min(290, 170 + (st.level - 1) * 14), Math.min(1, dt * 0.6));
+    const prog = clamp(st.dist / st.len, 0, 1);
+    if (st.finishing) { st.finishing += dt; st.speed = Math.max(0, st.speed - 260 * dt); }
+    else st.speed = lerp(st.speed, Math.min(290, 170 + (st.level - 1) * 12 + 40 * prog), Math.min(1, dt * 0.6));
     st.dist += st.speed * dt / 40;
+    if (!st.finishing) {
+      const toFlag = (VW + 60 - 106) / 40;
+      if (!st.cpSet && st.dist >= st.len / 2) { st.cpSet = true; G.cp = { level: st.level, dist: st.len / 2 }; st.banner = { txt: '🚩 ¡MITAD!', sub: 'Si te caes, sigues desde aquí', t: 2.2 }; SFX.food(); }
+      if (!st.stopSpawn && st.dist >= st.len - toFlag - 9) st.stopSpawn = true;
+      if (!st.flag && st.dist >= st.len - toFlag) { st.flag = true; st.obs.push({ k: 'flag', x: VW + 60, y: groundY, w: 30, h: 100 }); }
+    }
     // jugador
     if (!st.onGround) { st.vy += 1900 * dt; st.py += st.vy * dt; if (st.py >= 0) { st.py = 0; st.vy = 0; st.onGround = true; } }
     if (st.duck > 0) st.duck -= dt;
@@ -209,16 +221,17 @@ const Runner = (() => {
     const ducking = st.duck > 0 && st.onGround;
     const pb = { x: 92, y: groundY + st.py - (ducking ? 30 : 58), w: 28, h: ducking ? 30 : 58 };
     // generar
-    st.spawn -= dt; if (st.spawn <= 0) spawnPattern();
+    st.spawn -= dt; if (st.spawn <= 0 && !st.stopSpawn) spawnPattern();
     const dx = st.speed * dt;
     // obstáculos
     for (const o of st.obs) {
+      if (o.k === 'flag') { o.x -= dx; if (!st.finishing && o.x <= 112) finishLevel(); continue; }
       o.x -= dx + (o.k === 'spider' ? 55 * dt : o.k === 'bird' ? 35 * dt : 0);
       if (o.k === 'bird') o.y += Math.sin(st.t * 5 + o.ph) * 0.4;
       const bx = { x: o.x - o.w / 2 + 6, y: o.y - o.h + 4, w: o.w - 12, h: o.h - 8 };
       if (o.k === 'bird') { bx.y = o.y - 6; bx.h = o.h - 4; }
-      if (o.k === 'dry') { bx.y = o.y - 10; bx.h = 12; bx.x = o.x - o.w / 2 + 4; bx.w = o.w - 8; }
-      if (hit(pb, bx)) { o.dead = o.k !== 'dry' && o.k !== 'rock' ? true : o.dead; hurt(o.k); if (o.k === 'spider' || o.k === 'bird') { puff(o.x, o.y - 10, '#222', 6); } }
+      if (o.k === 'dry') { bx.y = o.y - 8; bx.h = 12; bx.x = o.x - o.w / 2 + 8; bx.w = o.w - 16; }
+      if (!st.finishing && hit(pb, bx)) { o.dead = o.k !== 'dry' && o.k !== 'rock' ? true : o.dead; hurt(o.k); if (o.k === 'spider' || o.k === 'bird') { puff(o.x, o.y - 10, '#222', 6); } }
       if (!st.seen[o.k] && o.x < VW - 40 && o.x > 100) {
         st.seen[o.k] = 1;
         if (o.k === 'spider' || o.k === 'bird') unlockFact('predators');
@@ -255,34 +268,36 @@ const Runner = (() => {
     st.pops = st.pops.filter(q => q.life > 0);
     if (pwFlash > 0) pwFlash -= dt;
     if (st.banner) { st.banner.t -= dt; if (st.banner.t <= 0) st.banner = null; }
-    if (st.biomeT < 1) st.biomeT = Math.min(1, st.biomeT + dt / 1.8);
+    if (st.t - (st._pt || 0) > 0.25) { st._pt = st.t; updProg(); }
   }
 
   function collect(p) {
     if (p.k === 'c') {
-      st.count++; st.prog++; st.lvCount++; SFX.pick(); puff(p.x, p.y, '#bcd', 5);
+      st.count++; st.prog++; SFX.pick(); puff(p.x, p.y, '#bcd', 5);
       if (st.count === 1) unlockFact('ball');
-      if (st.lvCount >= goalOf(st.level)) levelUp();
       if (st.prog >= 5) { st.prog = 0; if (st.charge < 3) { st.charge++; pop(106, groundY + st.py - 80, '+1 💧'); SFX.food(); } }
-      updProg(); updHUD();
+      updHUD();
+    } else if (p.k === 'heart') {
+      st.hearts = Math.min(3, st.hearts + 1); SFX.food(); pop(106, groundY + st.py - 80, '+1 ❤️'); updHUD();
     } else {
       st.gain[p.k]++; SFX.food();
       pop(106, groundY + st.py - 80, '+' + GIFT_ICON[p.k] + ' ' + GIFT_NAME[p.k]);
       if (p.k === 'hoja') unlockFact('decomp'); else if (p.k === 'verdura') unlockFact('veg'); else if (p.k === 'calcio') unlockFact('calcium'); else if (p.k === 'corteza') unlockFact('home'); else unlockFact('group');
     }
   }
-
   function updProg() {
     $('#rDist').textContent = '⭐ Nivel ' + st.level;
-    $('#rCount').textContent = '🐛 ' + st.lvCount + '/' + goalOf(st.level);
+    $('#rCount').textContent = '🏁 ' + Math.round(clamp(st.dist / st.len, 0, 1) * 100) + '%';
   }
-  function levelUp() {
-    st.lvCount = 0; st.level++; st.biomeT = 0; st.chansWon++;
-    const inv = G.save.inv; inv.chans = (inv.chans || 0) + 1; persist();
-    SFX.win(); puff(106, groundY + st.py - 40, '#ffe27a', 16);
-    st.banner = { txt: (['🌳', '🌲', '🌙'][(st.level - 1) % 3]) + ' NIVEL ' + st.level, sub: '¡Ganaste un chanchito para tu mochila! 🎒', t: 3 };
-    pop(106, groundY + st.py - 90, '+1 🐛');
-    if (st.level === 2) unlockFact('home', true);
+  function finishLevel() {
+    if (st.finishing) return;
+    st.finishing = 0.001; st.inv = 99; st.won = true; SFX.win();
+    st.banner = { txt: '🏁 ¡META!', sub: '', t: 3 };
+    for (let i = 0; i < 40; i++) st.parts.push({ x: rnd(60, VW - 60), y: rnd(20, groundY * 0.6), vx: rnd(-40, 40), vy: rnd(-60, 40), life: rnd(0.8, 1.6), c: pick(['#ffe27a', '#ff6b6b', '#6bd0ff', '#7be07b', '#fff']), r: rnd(3, 5) });
+    const inv = G.save.inv; inv.chans = (inv.chans || 0) + 1;
+    if (st.level >= (G.save.level || 1) && st.level < MAXLV) G.save.level = st.level + 1;
+    G.save.best = Math.max(G.save.best || 0, st.level); G.cp = null; persist();
+    setTimeout(() => endRun(true), 2300);
   }
   function updHUD() {
     $('#hearts').textContent = '❤️'.repeat(Math.max(0, st.hearts)) + '🖤'.repeat(Math.max(0, 3 - st.hearts));
@@ -292,30 +307,31 @@ const Runner = (() => {
     $('#bPower').classList.toggle('empty', st.charge < 1);
   }
 
-  function endRun() {
+  function endRun(won) {
     if (over) return; over = true; st.ended = true;
-    // las recompensas pasan a la colonia / inventario
     const inv = G.save.inv; for (const k in st.gain) inv[k] = (inv[k] || 0) + st.gain[k];
-    const lvl = st.level, meters = Math.floor(st.dist);
-    const newBest = lvl > G.save.best; if (newBest) G.save.best = lvl;
     G.save.runs++; G.save.rescued += st.count; persist();
-    SFX.win(); $('#toast').innerHTML = '';
+    if (!won) SFX.hurt();
+    $('#toast').innerHTML = '';
     const pend = (G.pending || []).slice(0, 1).map(id => FACT_BY_ID[id]);
     let fs = pend; if (!fs.length) { const f0 = pick(FACTS.filter(f => !['crust'].includes(f.id))); unlockFact(f0.id, true); fs = [f0]; }
-    const f = fs[0];
-    const nm = G.save.name ? G.save.name + ', ' : '';
+    const nm = G.save.name ? G.save.name : '';
+    const found = Object.keys(st.gain).filter(k => st.gain[k]).map(k => GIFT_ICON[k] + '×' + st.gain[k]).join(' ');
+    const cpOk = !won && G.cp && G.cp.level === st.level;
+    const nextLv = Math.min(MAXLV, G.save.level || 1);
     $('#resCard').innerHTML =
-      '<h2>' + (st.chansWon ? '¡Bien hecho, ' + nm.replace(', ', '') + '!' : '¡Buen intento!') + '</h2>' +
-      '<div class="stats"><div>⭐ ' + lvl + '<small>nivel</small></div><div>🎒 ' + (G.save.inv.chans || 0) + '<small>chanchitos en tu mochila</small></div><div>🏆 ' + G.save.best + '<small>récord' + (newBest ? ' nuevo' : '') + '</small></div></div>' +
-      '<p>' + (st.chansWon ? 'Ganaste ' + st.chansWon + ' chanchito' + (st.chansWon > 1 ? 's' : '') + ' por pasar de nivel. ¡Ponlos en tu terrario! 🏡' : 'Junta ' + goalOf(1) + ' chanchitos para pasar de nivel y ganar uno para tu terrario.') +
-      (Object.values(st.gain).some(v => v) ? '<br>Encontraste: ' + Object.keys(st.gain).filter(k => st.gain[k]).map(k => GIFT_ICON[k] + '×' + st.gain[k]).join(' ') : '') + '</p>' +
+      '<h2>' + (won ? '🏁 ¡Nivel ' + st.level + ' completo!' : '¡Casi' + (nm ? ', ' + nm : '') + '!') + '</h2>' +
+      '<div class="stats"><div>🎒 ' + (G.save.inv.chans || 0) + '<small>chanchitos en tu mochila</small></div><div>🐛 ' + st.count + '<small>juntados</small></div><div>🏁 ' + Math.round(clamp(st.dist / st.len, 0, 1) * 100) + '%<small>del camino</small></div></div>' +
+      '<p>' + (won ? '¡Ganaste <b>1 chanchito</b> para tu mochila! Ponlo en tu terrario 🏡' : cpOk ? 'Llegaste a la mitad. Puedes seguir desde la bandera 🚩' : 'Llega hasta la bandera 🏁 para ganar un chanchito.') + (found ? '<br>Encontraste: ' + found : '') + '</p>' +
       fs.map((ff, i) => '<div class="factbox"><span class="ic">' + ff.ic + '</span><div><b>' + (pend.length ? '📖 ¡Dato nuevo! ' : '') + ff.t + '</b>' + ff.x + '</div><button class="round resSay" data-i="' + i + '">🔊</button></div>').join('') +
-      '<button class="big azul" id="resTerr">🏡 IR AL TERRARIO</button><button class="big verde" id="resAgain">🏃 CORRER OTRA VEZ</button><button class="big gris" id="resMenu">MENÚ</button>';
+      (won ? '<button class="big verde" id="resAgain">▶ NIVEL ' + nextLv + '</button><button class="big azul" id="resTerr">🏡 IR AL TERRARIO</button>'
+           : '<button class="big verde" id="resAgain">' + (cpOk ? '🚩 SEGUIR DESDE LA MITAD' : '🔁 INTENTAR OTRA VEZ') + '</button><button class="big azul" id="resTerr">🏡 IR AL TERRARIO</button>') +
+      '<button class="big gris" id="resMenu">MENÚ</button>';
     document.querySelectorAll('.resSay').forEach(b => b.onclick = () => { const ff = fs[+b.dataset.i]; speak(ff.t + '. ' + ff.x); });
     $('#resTerr').onclick = () => show('terr');
     $('#resAgain').onclick = () => { stop(); start(); };
     $('#resMenu').onclick = () => show('menu');
-    setTimeout(() => $('#resOv').classList.remove('hidden'), 450);
+    setTimeout(() => $('#resOv').classList.remove('hidden'), won ? 100 : 450);
   }
 
   /* --- Dibujo --- */
@@ -325,12 +341,12 @@ const Runner = (() => {
 
   function draw() {
     cx.setTransform(S, 0, 0, S, 0, 0);
-    const nb = BIOMES[(st.level - 1) % BIOMES.length], b = BIOMES[(st.level + BIOMES.length - 2) % BIOMES.length];
-    const tt = st.level === 1 ? 1 : st.biomeT;
+    const fp = clamp(st.dist / st.len, 0, 1) * 3 + (st.level - 1), bi = Math.floor(Math.min(fp, (st.level - 1) + 2.999));
+    const b = BIOMES[bi % 3], nb = BIOMES[(bi + 1) % 3], tt = clamp((fp - bi - 0.8) / 0.2, 0, 1);
     const sky = cx.createLinearGradient(0, 0, 0, groundY);
     sky.addColorStop(0, mix(b.sky[0], nb.sky[0], tt)); sky.addColorStop(1, mix(b.sky[1], nb.sky[1], tt));
     cx.fillStyle = sky; cx.fillRect(0, 0, VW, LH);
-    const night = tt > 0.5 ? nb.name === 'Noche' : b.name === 'Noche' && st.level > 1;
+    const night = tt > 0.5 ? nb.name === 'Noche' : b.name === 'Noche';
     // sol / luna
     cx.fillStyle = night ? '#f4f1d8' : '#fff3a0'; cx.beginPath(); cx.arc(390, groundY * 0.28, 26, 0, 7); cx.fill();
     if (night) { cx.fillStyle = 'rgba(255,255,255,.8)'; for (let i = 0; i < 24; i++) { cx.fillRect((i * 97 + 31) % VW, (i * 53) % (groundY * 0.7), 2, 2); } }
@@ -360,10 +376,10 @@ const Runner = (() => {
     }
     // jugador
     const ducking = st.duck > 0 && st.onGround;
-    const state = !st.onGround ? 'jump' : ducking ? 'duck' : 'run';
+    const state = st.finishing && st.speed < 30 ? 'idle' : !st.onGround ? 'jump' : ducking ? 'duck' : 'run';
     if (!(st.inv > 0 && Math.floor(st.t * 14) % 2)) {
       cx.fillStyle = 'rgba(0,0,0,.25)'; cx.beginPath(); cx.ellipse(106, groundY + 14, 22 - Math.min(10, -st.py / 10), 5, 0, 0, 7); cx.fill();
-      drawKid(cx, 106, groundY + st.py + 12, st.t, { state, hurt: st.hurtT > 0, power: st.powerFx > 0, faceImg: G.faceImg, jar: Math.min(3, st.count) });
+      drawKid(cx, 106, groundY + st.py + 12, st.t, { state, hurt: st.hurtT > 0, power: st.powerFx > 0 || (st.finishing && st.speed < 30), faceImg: G.faceImg, jar: Math.min(3, st.count) });
     }
     // partículas y textos
     for (const q of st.parts) { cx.globalAlpha = clamp(q.life * 2.5, 0, 1); cx.fillStyle = q.c; cx.beginPath(); cx.arc(q.x, q.y, q.r, 0, 7); cx.fill(); } cx.globalAlpha = 1;
@@ -380,7 +396,13 @@ const Runner = (() => {
 
   function drawObs(o) {
     cx.lineWidth = 2.5; cx.strokeStyle = '#1d1a16';
-    if (o.k === 'rock') {
+    if (o.k === 'flag') {
+      cx.fillStyle = '#fff'; for (let i = 0; i < 6; i++) { cx.fillStyle = i % 2 ? '#1d1a16' : '#fff'; cx.fillRect(o.x - 70 + i * 24, o.y + 12, 24, 6); }
+      cx.fillStyle = '#d8d8d8'; cx.fillRect(o.x - 3, o.y - 100, 6, 112); cx.strokeRect(o.x - 3, o.y - 100, 6, 112);
+      cx.fillStyle = '#ffd34d'; cx.beginPath(); cx.arc(o.x, o.y - 102, 6, 0, 7); cx.fill(); cx.stroke();
+      const w = Math.sin(st.t * 6) * 4; cx.beginPath(); cx.moveTo(o.x + 3, o.y - 96); cx.lineTo(o.x + 52, o.y - 82 + w); cx.lineTo(o.x + 3, o.y - 62); cx.closePath(); cx.fillStyle = '#e5483b'; cx.fill(); cx.stroke();
+      cx.font = '900 14px sans-serif'; cx.textAlign = 'center'; cx.fillStyle = '#fff'; cx.fillText('🏁', o.x + 22, o.y - 76 + w / 2);
+    } else if (o.k === 'rock') {
       cx.fillStyle = '#9a9a9a'; cx.beginPath(); cx.moveTo(o.x - 22, o.y + 12); cx.quadraticCurveTo(o.x - 22, o.y - 22, o.x - 4, o.y - 20); cx.quadraticCurveTo(o.x + 22, o.y - 22, o.x + 22, o.y + 12); cx.closePath(); cx.fill(); cx.stroke();
       cx.fillStyle = '#b8b8b8'; cx.beginPath(); cx.ellipse(o.x - 6, o.y - 10, 7, 4, -0.4, 0, 7); cx.fill();
     } else if (o.k === 'dry') {
