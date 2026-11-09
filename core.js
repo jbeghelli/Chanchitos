@@ -11,7 +11,11 @@ const G = { save: null, faceImg: null, muted: false };
 function defaultSave() {
   return {
     name: '', faceURL: null,
-    inv: { hoja: 6, verdura: 2, calcio: 2, corteza: 1, rama: 1, palito: 2, piedra: 1, pina: 1, chans: 2 }, sexN: 0, level: 1,
+    inv: { hoja: 6, verdura: 2, calcio: 2, flor: 3, corteza: 1, rama: 1, palito: 2, piedra: 1, pina: 1 },
+    bichos: {},      // mochila: cuántos bichos de cada especie esperan para ponerse en el terrario
+    found: {},       // especies ganadas alguna vez (se muestran en la Bichopedia)
+    done: {},        // niveles completados
+    sexN: 0, level: 1, v: 4,   // level = nivel más alto desbloqueado (1 a 10)
     best: 0, facts: {}, colony: null, lastSeen: 0, runs: 0, rescued: 0, muted: false
   };
 }
@@ -20,6 +24,14 @@ const ALL_KEY = 'chanchitos_v3';
 function normKid(k) {
   const d = defaultSave(), r = Object.assign(d, k || {});
   r.inv = k && k.inv ? Object.assign({}, Object.fromEntries(Object.keys(d.inv).map(x => [x, 0])), k.inv) : Object.assign({}, d.inv);
+  r.bichos = Object.assign({}, r.bichos); r.found = Object.assign({}, r.found); r.done = Object.assign({}, r.done);
+  if (k && k.v !== 4) {   // guardado de la versión «solo chanchitos»: se convierte
+    const lv = Math.min(10, k.level || 1);
+    for (let l = 1; l < lv; l++) { r.done[l] = true; const id = LEVELS[l - 1].bug; r.found[id] = true; r.bichos[id] = (r.bichos[id] || 0) + 1; }
+    if (k.inv && k.inv.chans) { r.found.chanchito = true; r.bichos.chanchito = (r.bichos.chanchito || 0) + k.inv.chans; }
+    delete r.inv.chans; r.level = lv; r.v = 4;
+  }
+  if (r.inv.chans !== undefined) delete r.inv.chans;
   return r;
 }
 function loadAll() {
@@ -78,8 +90,9 @@ function openWho() {
   const l = $('#kids'); l.innerHTML = '';
   for (const k of G.all.kids) {
     const b = document.createElement('button'); b.className = 'kid'; b.dataset.id = k.id;
-    const cnt = k.colony && k.colony.isos ? k.colony.isos.length : 0;
-    b.innerHTML = '<div class="av">' + kidAvatar(k) + '</div><div class="nm">' + (k.name || 'Sin nombre').replace(/</g, '&lt;') + '<small>⭐ Nivel ' + (k.level || 1) + ' · 🐛 ' + cnt + ' en el terrario · 🎒 ' + (k.inv.chans || 0) + '</small></div>';
+    const cnt = k.colony ? (k.colony.bugs || k.colony.isos || []).length : 0;
+    const nBag = Object.values(k.bichos || {}).reduce((a, b) => a + b, 0), nSp = Object.keys(k.found || {}).length;
+    b.innerHTML = '<div class="av">' + kidAvatar(k) + '</div><div class="nm">' + (k.name || 'Sin nombre').replace(/</g, '&lt;') + '<small>⭐ Nivel ' + (k.level || 1) + ' · 🐞 ' + nSp + ' de 10 bichos · 🏡 ' + cnt + ' en el terrario · 🎒 ' + nBag + '</small></div>';
     b.onclick = () => { audio(); selectKid(k.id); };
     l.appendChild(b);
   }
@@ -142,38 +155,6 @@ function speak(text) {
   } catch (e) {}
 }
 
-/* ====== Datos curiosos (Chanciclopedia) ======
-   Fuentes: UF/IFAS EDIS IN1099 (Armadillidium vulgare), BioKIDS (U. Michigan), scaber.org,
-   ZooKeys 176 (agregación), revisión SciELO sobre cobre en isópodos, guías de cuidado de isópodos. */
-const FACTS = [
-  { id: 'crust', ic: '🦀', t: 'No son insectos', x: 'Los chanchitos de tierra no son insectos. Son crustáceos, ¡primos del camarón y del cangrejo! Son los crustáceos que mejor viven en tierra firme.' },
-  { id: 'legs', ic: '🦵', t: '¡14 patas!', x: 'Tienen 7 pares de patas, o sea 14. Los insectos tienen solo 6 patas. Y las antenas largas les sirven para tocar y oler el camino.' },
-  { id: 'gills', ic: '💧', t: 'Respiran con branquias', x: 'Respiran con branquias escondidas bajo la cola, como los peces y los cangrejos. Las branquias deben estar húmedas, por eso siempre buscan lugares con humedad.' },
-  { id: 'kinesis', ic: '🏃', t: 'Corren si hay sequedad', x: 'Cuando el aire está seco se mueven más rápido, y cuando hay humedad se calman. Así, andando y andando, encuentran un lugar húmedo.' },
-  { id: 'ball', ic: '⚽', t: 'Se hacen bolita', x: 'Al asustarse, el chanchito Armadillidium vulgare se enrolla en una bolita para proteger su panza blandita. Pero ojo: no todos los isópodos pueden hacerlo, ¡algunos solo corren!' },
-  { id: 'nocturnal', ic: '🌙', t: 'Les gusta la oscuridad', x: 'Prefieren la sombra y la noche. De día se esconden bajo piedras, troncos y cortezas; por eso en tu terrario necesitan escondites.' },
-  { id: 'group', ic: '👨‍👩‍👧', t: 'Les gusta juntarse', x: 'Se juntan en grupitos: así pierden menos agua y están más protegidos. Les encanta tocar cosas, ¡incluso a otros chanchitos!' },
-  { id: 'decomp', ic: '🍂', t: 'Los recicladores', x: 'Comen hojas secas, madera podrida y hongos. Al comer y hacer caquita, devuelven nutrientes a la tierra. ¡Son recicladores de la naturaleza!' },
-  { id: 'veg', ic: '🥕', t: 'Verduras con cuidado', x: 'Les gustan las verduras blanditas, como la zanahoria. Pero si sobra comida, aparece moho. Retira lo que no se coma en uno o dos días.' },
-  { id: 'calcium', ic: '🦴', t: 'Caparazón de calcio', x: 'Su armadura está hecha con calcio. Por eso en los terrarios se les da cáscara de huevo o hueso de jibia para que puedan fabricar un caparazón nuevo.' },
-  { id: 'molt', ic: '👕', t: 'Cambian de piel en dos partes', x: 'Cuando crecen, mudan su caparazón en dos mitades: primero la de atrás y después la de adelante. Por un ratito se ven mitad claros y mitad oscuros.' },
-  { id: 'molt2', ic: '🥚', t: 'Usan el calcio de nuevo', x: 'Guardan calcio en pequeñas manchas blancas del cuerpo y lo usan para endurecer la piel nueva. A veces se comen la piel que dejaron.' },
-  { id: 'marsupium', ic: '🎒', t: 'La mochila de mamá', x: 'La mamá lleva los huevos en una bolsa en la panza, llamada marsupio, con un líquido que alimenta a las crías. Las crías nacen blancas y pequeñitas: se llaman mancas.' },
-  { id: 'broods', ic: '👶', t: 'Varias camadas', x: 'Una mamá puede tener hasta tres camadas en una temporada. Los huevos tardan unas 3 o 4 semanas, y las crías se quedan un tiempito más en la bolsa.' },
-  { id: 'baby', ic: '🍼', t: 'Mudan al primer día', x: 'Las crías mudan su piel por primera vez el mismo día en que salen de la bolsa de mamá. ¡Por eso necesitan calcio desde chiquitas!' },
-  { id: 'copper', ic: '🔵', t: 'Sangre con cobre', x: 'Su sangre lleva cobre, como un metal. Los científicos creen que por eso a veces se comen su propia caquita: las bacterias de la caquita ayudan a recuperar cobre.' },
-  { id: 'predators', ic: '🕷️', t: '¡Tienen enemigos!', x: 'Arañas, ciempiés, sapos y pájaros se los comen. Hay arañas cazadoras de chanchitos que parecen hechas para eso. Por eso se esconden y se enrollan.' },
-  { id: 'temp', ic: '🌡️', t: 'Ni mucho calor ni mucho frío', x: 'Viven bien entre 18 y 27 grados. Sobre los 30 grados sufren, y con mucho frío se quedan lentos y casi dormidos.' },
-  { id: 'moisture', ic: '🏜️', t: 'Un lado húmedo y otro seco', x: 'En un buen terrario hay una parte más húmeda y otra más seca, para que cada chanchito elija dónde estar. Todo mojado tampoco sirve: aparece moho y se pueden ahogar.' },
-  { id: 'mold', ic: '🍄', t: 'Cuidado con el moho', x: 'La humedad y la comida vieja hacen crecer moho. Ventilar un poquito y sacar la comida que sobra mantiene sano al terrario.' },
-  { id: 'light', ic: '💡', t: 'La luz los asusta', x: 'No necesitan lámpara para vivir. La luz fuerte y el calor los secan y los asustan. El musgo sí necesita luz, así que hay que dar luz un ratito a la plantita.' },
-  { id: 'size', ic: '📏', t: 'Chiquitos pero firmes', x: 'Un chanchito adulto mide hasta unos 18 milímetros, como una uña pequeña. ¡Y no muerden ni pican a las personas!' },
-  { id: 'life', ic: '🎂', t: '¡Viven años!', x: 'Pueden vivir entre 2 y 5 años si los cuidan bien. En la naturaleza suelen vivir menos.' },
-  { id: 'world', ic: '🌍', t: 'Viajeros del mundo', x: 'Este chanchito es originario de Europa, pero hoy vive en jardines de muchos países del mundo.' },
-  { id: 'home', ic: '🏠', t: 'Su casa ideal', x: 'Un buen hogar tiene tierra suelta, hojas secas, trozos de corteza para esconderse, algo de calcio y humedad. ¡Justo lo que hay en el terrario!' }
-];
-const FACT_BY_ID = Object.fromEntries(FACTS.map(f => [f.id, f]));
-
 function factsUnlockedCount() { return Object.keys(G.save.facts).length; }
 
 function unlockFact(id, silent) {
@@ -221,29 +202,62 @@ function refreshMenu() {
   const n = G.save.name || '';
   $('#hello').textContent = '👋 ¡Hola, ' + n + '!  ·  cambiar de niño';
   $('#bFace').style.animation = G.save.faceURL ? '' : 'pulse 1.3s ease-in-out infinite';
-  const c = G.save.colony ? G.save.colony.isos.length : 0;
-  $('#colSub').textContent = c ? c + ' chanchitos en tu colonia' : 'cuida tu colonia';
-  $('#encSub').textContent = factsUnlockedCount() + ' de ' + FACTS.length + ' datos descubiertos';
+  const c = G.save.colony ? (G.save.colony.bugs || G.save.colony.isos || []).length : 0, bag = bagTotal();
+  $('#colSub').textContent = (c ? c + ' bicho' + (c > 1 ? 's' : '') + ' en tu terrario' : 'cuida a tus bichos') + (bag ? ' · 🎒 ' + bag + ' por poner' : '');
+  $('#encSub').textContent = Object.keys(G.save.found).length + ' de 10 bichos · ' + factsUnlockedCount() + ' de ' + FACTS.length + ' datos';
   $('#bMute').textContent = G.muted ? '🔇' : '🔊';
-  $('#runSub').textContent = 'nivel ' + (G.save.level || 1) + ' · gana un chanchito al llegar a la meta';
+  $('#runSub').textContent = 'nivel ' + (G.save.level || 1) + ' de 10 · cada meta te da un bicho';
 }
 
-/* ====== Chanciclopedia ====== */
+/* ====== Ganar bichos ====== */
+/** Agrega `n` bichos de la especie `id` a la mochila y desbloquea sus 2 primeros datos. */
+function giveBug(id, n) {
+  const s = G.save; s.bichos[id] = (s.bichos[id] || 0) + (n || 1);
+  const first = !s.found[id]; s.found[id] = true;
+  if (first) { unlockFact(id + '1', true); unlockFact(id + '2', true); }
+  persist(); return first;
+}
+const bagTotal = () => Object.values(G.save.bichos).reduce((a, b) => a + b, 0);
+
+/* ====== Selector de nivel ====== */
+function openLevels() {
+  const g = $('#lvGrid'); g.innerHTML = '';
+  for (const L of LEVELS) {
+    const open = L.n <= (G.save.level || 1), done = !!G.save.done[L.n], b = BUG_BY_ID[L.bug];
+    const t = document.createElement('button'); t.className = 'lvTile' + (open ? '' : ' lock') + (done ? ' done' : '');
+    t.innerHTML = '<img src="' + Art.icon(L.bug, 64) + '" alt="" class="' + (done ? '' : 'sil') + '"><b>' + L.n + '</b><small>' + (open ? L.name : 'Bloqueado') + '</small>' + (done ? '<i>✓</i>' : open ? '' : '<i>🔒</i>');
+    if (open) t.onclick = () => { $('#lvOv').classList.add('hidden'); G.runLevel = L.n; audio(); show('runner'); };
+    g.appendChild(t);
+  }
+  $('#lvOv').classList.remove('hidden');
+}
+
+/* ====== Bichopedia (una ficha por bicho, con datos y fuentes) ====== */
 function openEnc() {
   const l = $('#enclist'); l.innerHTML = '';
-  FACTS.forEach(f => {
-    const ok = !!G.save.facts[f.id];
-    const d = document.createElement('div');
-    d.className = 'fact' + (ok ? '' : ' lock');
-    d.innerHTML = ok
-      ? '<span class="ic">' + f.ic + '</span><div><b>' + f.t + '</b><span>' + f.x + '</span></div><button class="round">🔊</button>'
-      : '<span class="ic">❓</span><div><b>Dato secreto</b><span>Sigue jugando y cuidando a tus chanchitos para descubrirlo.</span></div>';
-    if (ok) d.querySelector('button').onclick = () => speak(f.t + '. ' + f.x);
-    l.appendChild(d);
-  });
+  const factHtml = (f) => '<div class="fact"><span class="ic">' + f.ic + '</span><div><b>' + f.t + '</b><span>' + f.x + '</span></div><button class="round" data-say="' + f.id + '">🔊</button></div>';
+  const lockHtml = n => n > 0 ? '<div class="fact lock"><span class="ic">❓</span><div><b>' + n + ' dato' + (n > 1 ? 's' : '') + ' secreto' + (n > 1 ? 's' : '') + '</b><span>Cuida a este bicho en el terrario para descubrirlos.</span></div></div>' : '';
+  for (const b of BUGS) {
+    const ok = !!G.save.found[b.id], fs = FACTS.filter(f => f.bug === b.id), got = fs.filter(f => G.save.facts[f.id]);
+    const d = document.createElement('details'); d.className = 'bcard' + (ok ? '' : ' lock');
+    const head = '<summary><span class="bi">' + (ok ? '<img src="' + Art.icon(b.id, 64) + '" alt="">' : '❓') + '</span><span class="bt"><b>' + (ok ? b.n : 'Bicho secreto ' + b.lvl) + '</b><small>' + (ok ? '<i>' + b.sci + '</i> · ' + got.length + '/' + fs.length + ' datos' : 'Pasa el nivel ' + b.lvl + ' (' + b.habitat + ')') + '</small></span></summary>';
+    let body = '';
+    if (ok) {
+      body = '<div class="chips"><span>' + b.grp + '</span><span>' + b.origin + '</span><span>' + b.size + '</span></div>' +
+        '<p><b>📍 Dónde vive:</b> ' + b.where + '</p><p><b>🍽️ Qué come:</b> ' + b.eats + '</p>' +
+        got.map(factHtml).join('') + lockHtml(fs.length - got.length) +
+        '<p class="srcs"><b>Fuentes:</b> ' + b.src.map(k => '<a href="' + SRC[k].u + '" target="_blank" rel="noopener">' + SRC[k].t + '</a>').join(' · ') + '</p>';
+    }
+    d.innerHTML = head + '<div class="bbody">' + body + '</div>'; l.appendChild(d);
+  }
+  const gf = FACTS.filter(f => f.bug === 'general'), gg = gf.filter(f => G.save.facts[f.id]);
+  const d = document.createElement('details'); d.className = 'bcard';
+  d.innerHTML = '<summary><span class="bi">🏡</span><span class="bt"><b>Cuidar el terrario</b><small>' + gg.length + '/' + gf.length + ' datos</small></span></summary><div class="bbody">' + gg.map(factHtml).join('') + lockHtml(gf.length - gg.length) + '</div>';
+  l.appendChild(d);
   const s = document.createElement('div'); s.className = 'src';
-  s.textContent = 'Basado en: UF/IFAS (EENY630), BioKIDS de la U. de Michigan, scaber.org, ZooKeys 176 y guías de cuidado de isópodos.';
+  s.innerHTML = 'La información de cada ficha viene de las fuentes que se enlazan en ella. Más detalle en <b>docs/BICHOS.md</b> del repositorio.';
   l.appendChild(s);
+  l.querySelectorAll('[data-say]').forEach(b => b.onclick = e => { e.stopPropagation(); const f = FACT_BY_ID[b.dataset.say]; speak(f.t + '. ' + f.x); });
 }
 
 /* ====== Mi cara: recorte de la foto ====== */

@@ -9,7 +9,8 @@
   $('#bOptClose').onclick = () => $('#optOv').classList.add('hidden');
   $('#bResetAll').onclick = () => confirmBox('¿Borrar <b>TODO</b>? Se pierden todos los niños, sus fotos, mochilas, terrarios y progreso. No se puede deshacer.', 'SÍ, BORRAR TODO', () => { resetAll(); $('#optOv').classList.add('hidden'); openWho(); });
   $('#hello').onclick = () => show('who');
-  $('#bRun').onclick = () => { audio(); show('runner'); };
+  $('#bRun').onclick = () => { audio(); openLevels(); };
+  $('#lvClose').onclick = () => $('#lvOv').classList.add('hidden');
   $('#bTerr').onclick = () => { audio(); show('terr'); };
   $('#bFace').onclick = () => show('face');
   $('#bEnc').onclick = () => show('enc');
@@ -26,8 +27,8 @@
       mx.setTransform(1, 0, 0, 1, 0, 0);
       mx.translate(mk.width * 0.42, mk.height * 0.97); mx.scale(s * 1.05, s * 1.05);
       drawKid(mx, 0, 0, t / 1000, { state: 'idle', faceImg: G.faceImg, jar: 3, power: Math.sin(t / 700) > 0.7 });
-      // chanchitos en bolita
-      drawBall(mx, 46, -9, 9, t / 400); drawBall(mx, 66, -9, 9, t / 300 + 1);
+      // flores de copihue
+      Art.copihue(mx, 50, -14, 1.4, t / 500); Art.copihue(mx, 74, -10, 1.1, t / 400 + 1);
     }
     requestAnimationFrame(menuLoop);
   }

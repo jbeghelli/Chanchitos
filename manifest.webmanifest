@@ -1,7 +1,7 @@
 {
-  "name": "Chanchitos de tierra",
-  "short_name": "Chanchitos",
-  "description": "Corre, rescata chanchitos y cuida tu colonia en el terrario.",
+  "name": "Bichos de Chile",
+  "short_name": "Bichos",
+  "description": "Corre, gana bichos de Chile y cuídalos en tu terrario.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "fullscreen",
@@ -10,7 +10,17 @@
   "theme_color": "#2f5d2a",
   "lang": "es",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }

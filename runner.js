@@ -19,7 +19,7 @@ function drawKid(ctx, x, y, t, o) {
   ctx.save(); ctx.translate(-17, -legH - bodyH * 0.55);
   ctx.fillStyle = 'rgba(190,230,255,.85)'; ctx.beginPath(); ctx.roundRect(-8, -9, 15, 20, 4); ctx.fill(); ctx.stroke();
   ctx.fillStyle = '#e5483b'; ctx.fillRect(-9, -13, 17, 5); ctx.strokeRect(-9, -13, 17, 5);
-  ctx.fillStyle = 'rgba(90,100,115,.9)'; for (let i = 0; i < Math.min(3, (o.jar | 0)); i++) { ctx.beginPath(); ctx.arc(-3 + i * 4, 6, 3, 0, 7); ctx.fill(); }
+  ctx.fillStyle = '#d6204a'; for (let i = 0; i < Math.min(3, (o.jar | 0)); i++) { ctx.beginPath(); ctx.arc(-3 + i * 4, 6, 3, 0, 7); ctx.fill(); }
   ctx.restore();
   // piernas
   ctx.fillStyle = '#2f5fb5';
@@ -68,22 +68,8 @@ function drawKid(ctx, x, y, t, o) {
   ctx.restore();
 }
 
-/* --- Chanchito (en bolita, rodando) --- */
-function drawBall(ctx, x, y, r, rot, white) {
-  ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
-  ctx.fillStyle = white ? '#f1ede4' : '#7b8896'; ctx.strokeStyle = '#1d1a16'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill(); ctx.stroke();
-  ctx.save(); ctx.beginPath(); ctx.arc(0, 0, r - 1, 0, 7); ctx.clip();
-  ctx.strokeStyle = 'rgba(30,35,45,.55)'; ctx.lineWidth = 1.4;
-  for (let i = -2; i <= 2; i++) { ctx.beginPath(); ctx.arc(i * r * 0.55 - r * 1.1, 0, r * 1.15, -1.4, 1.4); ctx.stroke(); }
-  ctx.fillStyle = 'rgba(255,255,255,.35)'; ctx.beginPath(); ctx.ellipse(-r * 0.3, -r * 0.4, r * 0.35, r * 0.2, -0.6, 0, 7); ctx.fill();
-  ctx.restore(); ctx.restore();
-}
-
 const Runner = (() => {
   const LW = 400;
-  const MAXLV = 12;
-  const lenOf = lv => Math.min(900, 400 + 100 * (lv - 1));   // metros de cada nivel
   const GIFTS = ['hoja', 'hoja', 'verdura', 'calcio', 'corteza', 'rama', 'palito', 'piedra', 'pina'];
   const GIFT_ICON = { heart: '❤️', hoja: '🍃', verdura: '🥕', calcio: '🦴', corteza: '🪵', rama: '🌿', palito: '🥢', piedra: '🪨', pina: '🌰' };
   const GIFT_NAME = { hoja: 'Hoja', verdura: 'Zanahoria', calcio: 'Calcio', corteza: 'Corteza', rama: 'Rama', palito: 'Palito', piedra: 'Piedra', pina: 'Piña' };
@@ -91,12 +77,6 @@ const Runner = (() => {
   let raf = 0, last = 0, running = false, paused = false, over = false;
   let st;           // estado de la carrera
   const keys = {};
-  const BIOMES = [
-    { name: 'Jardín',  sky: ['#8fd3ff', '#d8f3ff'], hill: '#7cc45a', hill2: '#5fae48', ground: '#6bbf4a', dirt: '#6b4a2b', start: 0 },
-    { name: 'Bosque',  sky: ['#ffb36b', '#ffe3b0'], hill: '#4f8f3d', hill2: '#3d7a35', ground: '#4a9a3a', dirt: '#5a3d22', start: 450 },
-    { name: 'Noche',   sky: ['#1b2250', '#3b4a8a'], hill: '#26502f', hill2: '#1d4026', ground: '#2f7a3a', dirt: '#3a2814', start: 950 }
-  ];
-
   function resize() {
     const r = cv.getBoundingClientRect(), d = Math.min(window.devicePixelRatio || 1, 2);
     cv.width = r.width * d; cv.height = r.height * d; W = r.width; H = r.height;
@@ -105,7 +85,7 @@ const Runner = (() => {
   }
 
   function newState() {
-    const level = Math.min(MAXLV, G.save.level || 1), len = lenOf(level);
+    const level = clamp(G.runLevel || G.save.level || 1, 1, 10), len = LEVELS[level - 1].len;
     const cp = G.cp && G.cp.level === level ? G.cp.dist : 0;
     return {
       t: 0, dist: cp, len, speed: 170, hearts: 3, count: 0, charge: 1, prog: 0, level, cp, cpSet: !!cp, hearted: {}, flag: false, finishing: 0, won: false, stopSpawn: false,
@@ -164,9 +144,9 @@ const Runner = (() => {
     const easy = st.level === 1 && prog < 0.1;                                       // comienzo tranquilo
     const L = [['rock', 22], ['line', 12], ['gift', 7]];
     if (!easy) {
-      L.push(['dry', 14], ['bird', 14 + d * 6], ['spider', 8 + d * 12]);
-      if (d > 0.25) L.push(['rock2', 8 + d * 8], ['spiderrock', 8 + d * 6]);
-      if (d > 0.4) L.push(['drybird', 10], ['birdspider', 8 + d * 6], ['trio', 6 + d * 6]);
+      L.push(['dry', 14], ['bird', 14 + d * 6], ['lizard', 8 + d * 12]);
+      if (d > 0.25) L.push(['rock2', 8 + d * 8], ['lizardrock', 8 + d * 6]);
+      if (d > 0.4) L.push(['drybird', 10], ['birdlizard', 8 + d * 6], ['trio', 6 + d * 6]);
     }
     // corazón extra en 25%, 50% y 75% del nivel
     for (const q of [0.25, 0.5, 0.75]) if (prog >= q && !st.hearted[q] && st.hearts < 3) { st.hearted[q] = 1; st.picks.push({ k: 'heart', x: x0 + 20, y: g - 50, r: 16, rot: 0 }); }
@@ -174,15 +154,15 @@ const Runner = (() => {
     if (k === 'rock') { st.obs.push({ k: 'rock', x: x0 + 60, y: g, w: 40, h: 30 }); chans(x0 + 20, g - 30, 5, 24, arc(88)); }
     else if (k === 'dry') { st.obs.push({ k: 'dry', x: x0 + 70, y: g, w: 60, h: 12 }); chans(x0 + 28, g - 26, 5, 24, arc(95)); }
     else if (k === 'bird') { st.obs.push({ k: 'bird', x: x0 + 40, y: g - 52, w: 52, h: 30, ph: rnd(0, 6) }); chans(x0 - 10, g - 14, 6, 28, 0); }
-    else if (k === 'spider') { st.obs.push({ k: 'spider', x: x0 + 20, y: g, w: 40, h: 26, ph: rnd(0, 6), hp: 1 }); chans(x0 + 120, g - 14, 4, 26, 0); }
+    else if (k === 'lizard') { st.obs.push({ k: 'lizard', x: x0 + 20, y: g, w: 40, h: 26, ph: rnd(0, 6), hp: 1 }); chans(x0 + 120, g - 14, 4, 26, 0); }
     else if (k === 'line') chans(x0, g - 14, 7, 26, 0);
     else if (k === 'gift') { st.picks.push({ k: pick(GIFTS), x: x0 + 30, y: g - 44, r: 16, rot: 0 }); chans(x0 + 80, g - 14, 3, 26, 0); }
     else if (k === 'rock2') { st.obs.push({ k: 'rock', x: x0 + 40, y: g, w: 40, h: 30 }, { k: 'rock', x: x0 + 270, y: g, w: 40, h: 30 }); chans(x0 + 10, g - 30, 4, 24, arc(80)); chans(x0 + 240, g - 30, 4, 24, arc(80)); }
-    else if (k === 'spiderrock') { st.obs.push({ k: 'spider', x: x0 + 20, y: g, w: 40, h: 26, ph: rnd(0, 6), hp: 1 }, { k: 'rock', x: x0 + 300, y: g, w: 40, h: 30 }); chans(x0 + 270, g - 30, 4, 24, arc(85)); }
+    else if (k === 'lizardrock') { st.obs.push({ k: 'lizard', x: x0 + 20, y: g, w: 40, h: 26, ph: rnd(0, 6), hp: 1 }, { k: 'rock', x: x0 + 300, y: g, w: 40, h: 30 }); chans(x0 + 270, g - 30, 4, 24, arc(85)); }
     else if (k === 'drybird') { st.obs.push({ k: 'dry', x: x0 + 40, y: g, w: 60, h: 12 }, { k: 'bird', x: x0 + 320, y: g - 52, w: 52, h: 30, ph: 0 }); chans(x0 + 270, g - 14, 4, 26, 0); }
-    else if (k === 'birdspider') { st.obs.push({ k: 'bird', x: x0 + 20, y: g - 52, w: 52, h: 30, ph: 1 }, { k: 'spider', x: x0 + 330, y: g, w: 40, h: 26, ph: 2, hp: 1 }); chans(x0 + 120, g - 14, 4, 26, 0); }
+    else if (k === 'birdlizard') { st.obs.push({ k: 'bird', x: x0 + 20, y: g - 52, w: 52, h: 30, ph: 1 }, { k: 'lizard', x: x0 + 330, y: g, w: 40, h: 26, ph: 2, hp: 1 }); chans(x0 + 120, g - 14, 4, 26, 0); }
     else if (k === 'trio') { st.obs.push({ k: 'rock', x: x0 + 30, y: g, w: 40, h: 30 }, { k: 'bird', x: x0 + 290, y: g - 52, w: 52, h: 30, ph: 0 }, { k: 'rock', x: x0 + 560, y: g, w: 40, h: 30 }); chans(x0 + 400, g - 14, 4, 26, 0); }
-    const reach = k === 'rock2' ? 300 : k === 'spiderrock' ? 340 : k === 'drybird' ? 360 : k === 'birdspider' ? 370 : k === 'trio' ? 600 : 0;
+    const reach = k === 'rock2' ? 300 : k === 'lizardrock' ? 340 : k === 'drybird' ? 360 : k === 'birdlizard' ? 370 : k === 'trio' ? 600 : 0;
     const gapPx = Math.max(240, rnd(290, 380) * (1 - 0.25 * d)) + reach;
     st.spawn = gapPx / st.speed;
   }
@@ -226,15 +206,15 @@ const Runner = (() => {
     // obstáculos
     for (const o of st.obs) {
       if (o.k === 'flag') { o.x -= dx; if (!st.finishing && o.x <= 112) finishLevel(); continue; }
-      o.x -= dx + (o.k === 'spider' ? 55 * dt : o.k === 'bird' ? 35 * dt : 0);
+      o.x -= dx + (o.k === 'lizard' ? 55 * dt : o.k === 'bird' ? 35 * dt : 0);
       if (o.k === 'bird') o.y += Math.sin(st.t * 5 + o.ph) * 0.4;
       const bx = { x: o.x - o.w / 2 + 6, y: o.y - o.h + 4, w: o.w - 12, h: o.h - 8 };
       if (o.k === 'bird') { bx.y = o.y - 6; bx.h = o.h - 4; }
       if (o.k === 'dry') { bx.y = o.y - 8; bx.h = 12; bx.x = o.x - o.w / 2 + 8; bx.w = o.w - 16; }
-      if (!st.finishing && hit(pb, bx)) { o.dead = o.k !== 'dry' && o.k !== 'rock' ? true : o.dead; hurt(o.k); if (o.k === 'spider' || o.k === 'bird') { puff(o.x, o.y - 10, '#222', 6); } }
+      if (!st.finishing && hit(pb, bx)) { o.dead = o.k !== 'dry' && o.k !== 'rock' ? true : o.dead; hurt(o.k); if (o.k === 'lizard' || o.k === 'bird') { puff(o.x, o.y - 10, '#222', 6); } }
       if (!st.seen[o.k] && o.x < VW - 40 && o.x > 100) {
         st.seen[o.k] = 1;
-        if (o.k === 'spider' || o.k === 'bird') unlockFact('predators');
+        if (o.k === 'lizard' || o.k === 'bird') unlockFact('predators');
         if (o.k === 'dry') { say('¡Suelo seco y caliente! Salta sobre él: los chanchitos odian la sequedad.', '🏜️'); }
         if (o.k === 'rock') { /* sin aviso */ }
       }
@@ -253,7 +233,7 @@ const Runner = (() => {
     for (const p of st.proj) {
       p.x += p.vx * dt; p.life -= dt;
       for (const o of st.obs) {
-        if (o.k === 'spider' || o.k === 'bird') {
+        if (o.k === 'lizard' || o.k === 'bird') {
           if (Math.abs(p.x - o.x) < o.w / 2 + 8 && Math.abs(p.y - (o.y - o.h / 2)) < 30) {
             o.dead = true; p.life = 0; puff(o.x, o.y - 12, '#35b7ff', 12); SFX.pop(); pop(o.x, o.y - 40, '¡Splash!');
           }
@@ -273,8 +253,7 @@ const Runner = (() => {
 
   function collect(p) {
     if (p.k === 'c') {
-      st.count++; st.prog++; SFX.pick(); puff(p.x, p.y, '#bcd', 5);
-      if (st.count === 1) unlockFact('ball');
+      st.count++; st.prog++; SFX.pick(); puff(p.x, p.y, '#ff9ab0', 5); updProg();
       if (st.prog >= 5) { st.prog = 0; if (st.charge < 3) { st.charge++; pop(106, groundY + st.py - 80, '+1 💧'); SFX.food(); } }
       updHUD();
     } else if (p.k === 'heart') {
@@ -286,7 +265,7 @@ const Runner = (() => {
     }
   }
   function updProg() {
-    $('#rDist').textContent = '⭐ Nivel ' + st.level;
+    $('#rDist').textContent = '⭐' + st.level + ' · 🌺' + st.count;
     $('#rCount').textContent = '🏁 ' + Math.round(clamp(st.dist / st.len, 0, 1) * 100) + '%';
   }
   function finishLevel() {
@@ -294,8 +273,10 @@ const Runner = (() => {
     st.finishing = 0.001; st.inv = 99; st.won = true; SFX.win();
     st.banner = { txt: '🏁 ¡META!', sub: '', t: 3 };
     for (let i = 0; i < 40; i++) st.parts.push({ x: rnd(60, VW - 60), y: rnd(20, groundY * 0.6), vx: rnd(-40, 40), vy: rnd(-60, 40), life: rnd(0.8, 1.6), c: pick(['#ffe27a', '#ff6b6b', '#6bd0ff', '#7be07b', '#fff']), r: rnd(3, 5) });
-    const inv = G.save.inv; inv.chans = (inv.chans || 0) + 1;
-    if (st.level >= (G.save.level || 1) && st.level < MAXLV) G.save.level = st.level + 1;
+    // premio: el bicho de este nivel (el primero es «nuevo»; repetir el nivel da otro igual)
+    st.reward = LEVELS[st.level - 1].bug; st.rewardNew = giveBug(st.reward, 1);
+    G.save.done[st.level] = true;
+    if (st.level >= (G.save.level || 1) && st.level < 10) G.save.level = st.level + 1;
     G.save.best = Math.max(G.save.best || 0, st.level); G.cp = null; persist();
     setTimeout(() => endRun(true), 2300);
   }
@@ -310,57 +291,69 @@ const Runner = (() => {
   function endRun(won) {
     if (over) return; over = true; st.ended = true;
     const inv = G.save.inv; for (const k in st.gain) inv[k] = (inv[k] || 0) + st.gain[k];
+    const flores = Math.floor(st.count / 10); inv.flor = (inv.flor || 0) + flores;   // cada 10 copihues = 1 flor para el terrario
     G.save.runs++; G.save.rescued += st.count; persist();
     if (!won) SFX.hurt();
     $('#toast').innerHTML = '';
     const pend = (G.pending || []).slice(0, 1).map(id => FACT_BY_ID[id]);
-    let fs = pend; if (!fs.length) { const f0 = pick(FACTS.filter(f => !['crust'].includes(f.id))); unlockFact(f0.id, true); fs = [f0]; }
+    let fs = pend; if (!fs.length) { const f0 = pick(FACTS.filter(f => f.bug === 'general')); unlockFact(f0.id, true); fs = [f0]; }
     const nm = G.save.name ? G.save.name : '';
     const found = Object.keys(st.gain).filter(k => st.gain[k]).map(k => GIFT_ICON[k] + '×' + st.gain[k]).join(' ');
     const cpOk = !won && G.cp && G.cp.level === st.level;
-    const nextLv = Math.min(MAXLV, G.save.level || 1);
+    const pct = Math.round(clamp(st.dist / st.len, 0, 1) * 100);
+    let reward = '';
+    if (won) { const b = BUG_BY_ID[st.reward];
+      reward = '<div class="reward"><img src="' + Art.icon(b.id, 96) + '" alt=""><div><small>' + (st.rewardNew ? '¡NUEVO BICHO!' : 'Otro más para tu mochila') + '</small><b>' + b.n + '</b><i>' + b.sci + '</i></div></div>'; }
     $('#resCard').innerHTML =
-      '<h2>' + (won ? '🏁 ¡Nivel ' + st.level + ' completo!' : '¡Casi' + (nm ? ', ' + nm : '') + '!') + '</h2>' +
-      '<div class="stats"><div>🎒 ' + (G.save.inv.chans || 0) + '<small>chanchitos en tu mochila</small></div><div>🐛 ' + st.count + '<small>juntados</small></div><div>🏁 ' + Math.round(clamp(st.dist / st.len, 0, 1) * 100) + '%<small>del camino</small></div></div>' +
-      '<p>' + (won ? '¡Ganaste <b>1 chanchito</b> para tu mochila! Ponlo en tu terrario 🏡' : cpOk ? 'Llegaste a la mitad. Puedes seguir desde la bandera 🚩' : 'Llega hasta la bandera 🏁 para ganar un chanchito.') + (found ? '<br>Encontraste: ' + found : '') + '</p>' +
+      '<h2>' + (won ? '🏁 ¡Nivel ' + st.level + ' completo!' : '¡Casi' + (nm ? ', ' + nm : '') + '!') + '</h2>' + reward +
+      '<div class="stats"><div>🌺 ' + st.count + '<small>copihues' + (flores ? ' (+' + flores + ' flor' + (flores > 1 ? 'es' : '') + ' 🎒)' : '') + '</small></div><div>🏁 ' + pct + '%<small>del camino</small></div><div>🎒 ' + bagTotal() + '<small>bichos en tu mochila</small></div></div>' +
+      '<p>' + (won ? 'Ve al terrario y pon a tu nuevo bicho en la tierra 🏡' : cpOk ? 'Llegaste a la mitad. Puedes seguir desde la bandera 🚩' : 'Llega hasta la bandera 🏁 para ganar el bicho de este nivel: <b>' + BUG_BY_ID[LEVELS[st.level - 1].bug].n + '</b>.') + (found ? '<br>Encontraste: ' + found : '') + '</p>' +
       fs.map((ff, i) => '<div class="factbox"><span class="ic">' + ff.ic + '</span><div><b>' + (pend.length ? '📖 ¡Dato nuevo! ' : '') + ff.t + '</b>' + ff.x + '</div><button class="round resSay" data-i="' + i + '">🔊</button></div>').join('') +
-      (won ? '<button class="big verde" id="resAgain">▶ NIVEL ' + nextLv + '</button><button class="big azul" id="resTerr">🏡 IR AL TERRARIO</button>'
+      (won ? '<button class="big azul" id="resTerr">🏡 PONERLO EN EL TERRARIO</button>' + (st.level < 10 ? '<button class="big verde" id="resAgain">▶ NIVEL ' + (st.level + 1) + '</button>' : '<button class="big verde" id="resAgain">🔁 JUGAR OTRA VEZ</button>')
            : '<button class="big verde" id="resAgain">' + (cpOk ? '🚩 SEGUIR DESDE LA MITAD' : '🔁 INTENTAR OTRA VEZ') + '</button><button class="big azul" id="resTerr">🏡 IR AL TERRARIO</button>') +
       '<button class="big gris" id="resMenu">MENÚ</button>';
     document.querySelectorAll('.resSay').forEach(b => b.onclick = () => { const ff = fs[+b.dataset.i]; speak(ff.t + '. ' + ff.x); });
     $('#resTerr').onclick = () => show('terr');
-    $('#resAgain').onclick = () => { stop(); start(); };
+    $('#resAgain').onclick = () => { G.runLevel = won && st.level < 10 ? st.level + 1 : st.level; stop(); start(); };
     $('#resMenu').onclick = () => show('menu');
     setTimeout(() => $('#resOv').classList.remove('hidden'), won ? 100 : 450);
   }
 
   /* --- Dibujo --- */
-  function biomeAt(d) { let i = 0; for (let k = 0; k < BIOMES.length; k++) if (d >= BIOMES[k].start) i = k; return BIOMES[i]; }
-  const hex = h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16));
-  const mix = (a, b, t) => { const A = hex(a), B = hex(b); return 'rgb(' + A.map((v, i) => Math.round(lerp(v, B[i], t))).join(',') + ')'; };
+  function drawDeco(b, night) {
+    const kind = b.deco, shade = night ? 0.55 : 1;
+    const dark = (col, k) => { const c = [1, 3, 5].map(i => parseInt(col.substr(i, 2), 16)); return 'rgb(' + c.map(v => Math.round(v * k)).join(',') + ')'; };
+    const sc = (i, gap, sp) => ((i * gap - st.dist * sp) % (VW + gap * 1.2) + VW + gap * 1.2) % (VW + gap * 1.2) - gap * 0.5;
+    const g = groundY;
+    if (kind === 'trees') for (let i = 0; i < 5; i++) { const x = sc(i, 140, 38); cx.fillStyle = '#4a3320'; cx.fillRect(x - 3, g - 52, 6, 52); cx.fillStyle = night ? '#1e5a2c' : '#3f8f3a'; cx.beginPath(); cx.arc(x, g - 62, 22, 0, 7); cx.arc(x - 14, g - 50, 15, 0, 7); cx.arc(x + 14, g - 50, 15, 0, 7); cx.fill(); }
+    else if (kind === 'bushes') for (let i = 0; i < 7; i++) { const x = sc(i, 95, 38); cx.fillStyle = dark('#4f9d3a', shade); cx.beginPath(); cx.arc(x, g - 10, 18, 0, 7); cx.arc(x - 16, g - 4, 13, 0, 7); cx.arc(x + 16, g - 4, 13, 0, 7); cx.fill(); cx.fillStyle = '#ff7a9a'; for (let k = 0; k < 3; k++) { cx.beginPath(); cx.arc(x - 9 + k * 9, g - 14 + (k % 2) * 6, 2.4, 0, 7); cx.fill(); } }
+    else if (kind === 'pines') for (let i = 0; i < 6; i++) { const x = sc(i, 110, 38), h = 70 + (i % 3) * 14; cx.fillStyle = '#4a3320'; cx.fillRect(x - 3, g - 14, 6, 14); cx.fillStyle = dark('#1f6b3a', shade); for (let k = 0; k < 3; k++) { cx.beginPath(); cx.moveTo(x, g - h + k * 18); cx.lineTo(x - 22 + k * 3, g - 14 - (2 - k) * 14); cx.lineTo(x + 22 - k * 3, g - 14 - (2 - k) * 14); cx.closePath(); cx.fill(); } }
+    else if (kind === 'cactus') for (let i = 0; i < 5; i++) { const x = sc(i, 120, 38), h = 56 + (i % 3) * 12; cx.fillStyle = '#5a9a4a'; cx.strokeStyle = '#1d1a16'; cx.lineWidth = 2; cx.beginPath(); cx.roundRect(x - 7, g - h, 14, h, 7); cx.fill(); cx.stroke(); cx.beginPath(); cx.roundRect(x - 22, g - h * 0.7, 9, 24, 4); cx.fill(); cx.stroke(); cx.beginPath(); cx.roundRect(x + 13, g - h * 0.55, 9, 20, 4); cx.fill(); cx.stroke(); }
+    else if (kind === 'chagual') for (let i = 0; i < 5; i++) { const x = sc(i, 130, 38); cx.strokeStyle = '#4a7a3a'; cx.lineWidth = 3; for (let k = -3; k <= 3; k++) { cx.beginPath(); cx.moveTo(x, g); cx.quadraticCurveTo(x + k * 9, g - 22, x + k * 14, g - 34 + Math.abs(k) * 4); cx.stroke(); } if (i % 2 === 0) { cx.strokeStyle = '#6a8a4a'; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(x, g - 8); cx.lineTo(x, g - 78); cx.stroke(); cx.fillStyle = '#c8d86a'; for (let k = 0; k < 5; k++) { cx.beginPath(); cx.arc(x + (k % 2 ? 4 : -4), g - 80 + k * 7, 3.4, 0, 7); cx.fill(); } } }
+    else if (kind === 'reeds') { cx.fillStyle = 'rgba(70,170,230,.85)'; cx.fillRect(0, g - 20, VW, 20); cx.fillStyle = 'rgba(255,255,255,.35)'; for (let i = 0; i < 14; i++) cx.fillRect(sc(i, 40, 30), g - 14 + (i % 3) * 5, 14, 2);
+      for (let i = 0; i < 9; i++) { const x = sc(i, 70, 38); cx.strokeStyle = '#4a7a3a'; cx.lineWidth = 2.5; cx.beginPath(); cx.moveTo(x, g); cx.lineTo(x + 2, g - 50 - (i % 3) * 10); cx.stroke(); cx.fillStyle = '#6b4226'; cx.beginPath(); cx.roundRect(x - 1, g - 62 - (i % 3) * 10, 6, 16, 3); cx.fill(); } }
+    else if (kind === 'rocks') for (let i = 0; i < 6; i++) { const x = sc(i, 110, 38), w = 30 + (i % 3) * 14; cx.fillStyle = dark('#8a8680', shade); cx.strokeStyle = '#1d1a16'; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(x - w, g); cx.lineTo(x - w * 0.6, g - w * 0.9); cx.lineTo(x + w * 0.1, g - w * 1.2); cx.lineTo(x + w, g); cx.closePath(); cx.fill(); cx.stroke(); }
+  }
 
   function draw() {
     cx.setTransform(S, 0, 0, S, 0, 0);
-    const fp = clamp(st.dist / st.len, 0, 1) * 3 + (st.level - 1), bi = Math.floor(Math.min(fp, (st.level - 1) + 2.999));
-    const b = BIOMES[bi % 3], nb = BIOMES[(bi + 1) % 3], tt = clamp((fp - bi - 0.8) / 0.2, 0, 1);
+    const b = LEVELS[st.level - 1].biome, night = !!b.stars;
     const sky = cx.createLinearGradient(0, 0, 0, groundY);
-    sky.addColorStop(0, mix(b.sky[0], nb.sky[0], tt)); sky.addColorStop(1, mix(b.sky[1], nb.sky[1], tt));
+    sky.addColorStop(0, b.sky[0]); sky.addColorStop(1, b.sky[1]);
     cx.fillStyle = sky; cx.fillRect(0, 0, VW, LH);
-    const night = tt > 0.5 ? nb.name === 'Noche' : b.name === 'Noche';
-    // sol / luna
-    cx.fillStyle = night ? '#f4f1d8' : '#fff3a0'; cx.beginPath(); cx.arc(390, groundY * 0.28, 26, 0, 7); cx.fill();
+    // sol / luna y estrellas
+    cx.fillStyle = b.sun === 'moon' ? '#f4f1d8' : '#fff3a0'; cx.beginPath(); cx.arc(VW - 60, groundY * 0.28, 26, 0, 7); cx.fill();
     if (night) { cx.fillStyle = 'rgba(255,255,255,.8)'; for (let i = 0; i < 24; i++) { cx.fillRect((i * 97 + 31) % VW, (i * 53) % (groundY * 0.7), 2, 2); } }
     // nubes
     cx.fillStyle = night ? 'rgba(255,255,255,.18)' : 'rgba(255,255,255,.85)';
     for (let i = 0; i < 4; i++) { const x = ((i * 190 - st.dist * 6) % (VW + 200) + VW + 200) % (VW + 200) - 100, y = groundY * (0.18 + (i % 3) * 0.12); cx.beginPath(); cx.ellipse(x, y, 42, 14, 0, 0, 7); cx.ellipse(x + 24, y - 8, 28, 14, 0, 0, 7); cx.fill(); }
     // colinas
     const hill = (col, off, amp, sp, base) => { cx.fillStyle = col; cx.beginPath(); cx.moveTo(0, groundY); for (let x = 0; x <= VW; x += 12) cx.lineTo(x, groundY - base - Math.sin((x + st.dist * sp) / off) * amp); cx.lineTo(VW, groundY); cx.fill(); };
-    hill(mix(b.hill2, nb.hill2, tt), 70, 22, 14, 46); hill(mix(b.hill, nb.hill, tt), 45, 14, 26, 18);
-    // árboles de fondo
-    for (let i = 0; i < 5; i++) { const x = ((i * 140 - st.dist * 38) % (VW + 160) + VW + 160) % (VW + 160) - 60; cx.fillStyle = '#4a3320'; cx.fillRect(x - 3, groundY - 52, 6, 52); cx.fillStyle = mix('#3f8f3a', '#1e5a2c', night ? 1 : tt); cx.beginPath(); cx.arc(x, groundY - 62, 22, 0, 7); cx.arc(x - 14, groundY - 50, 15, 0, 7); cx.arc(x + 14, groundY - 50, 15, 0, 7); cx.fill(); }
+    hill(b.hill2, 70, 22, 14, 46); hill(b.hill, 45, 14, 26, 18);
+    drawDeco(b, night);
     // suelo
-    cx.fillStyle = mix(b.ground, nb.ground, tt); cx.fillRect(0, groundY, VW, 16);
-    cx.fillStyle = mix(b.dirt, nb.dirt, tt); cx.fillRect(0, groundY + 16, VW, LH - groundY);
+    cx.fillStyle = b.ground; cx.fillRect(0, groundY, VW, 16);
+    cx.fillStyle = b.dirt; cx.fillRect(0, groundY + 16, VW, LH - groundY);
     cx.strokeStyle = '#1d1a16'; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(0, groundY + 16); cx.lineTo(VW, groundY + 16); cx.stroke();
     cx.fillStyle = 'rgba(0,0,0,.18)'; for (let i = 0; i < 40; i++) { const x = ((i * 53 - st.dist * 40) % VW + VW) % VW; cx.fillRect(x, groundY + 24 + (i * 37) % Math.max(10, LH - groundY - 30), 8, 3); }
     cx.fillStyle = 'rgba(255,255,255,.35)'; for (let i = 0; i < 30; i++) { const x = ((i * 31 - st.dist * 40) % VW + VW) % VW; cx.fillRect(x, groundY + 2, 2, 7); }
@@ -416,21 +409,21 @@ const Runner = (() => {
       cx.fillStyle = '#ffb300'; cx.beginPath(); cx.moveTo(o.x - 26, o.y + 1); cx.lineTo(o.x - 38, o.y + 5); cx.lineTo(o.x - 26, o.y + 8); cx.fill(); cx.stroke();
       cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(o.x - 20, o.y, 3, 0, 7); cx.fill(); cx.fillStyle = '#000'; cx.beginPath(); cx.arc(o.x - 21, o.y, 1.4, 0, 7); cx.fill();
       cx.fillStyle = '#7b8fc0'; cx.beginPath(); cx.moveTo(o.x - 4, o.y + 4); cx.quadraticCurveTo(o.x + 4, o.y - 22 * fl - 6, o.x + 20, o.y - 16 * fl); cx.quadraticCurveTo(o.x + 10, o.y + 4, o.x - 4, o.y + 6); cx.fill(); cx.stroke();
-    } else if (o.k === 'spider') {
-      const t = st.t * 12 + o.ph;
-      cx.strokeStyle = '#1d1a16'; cx.lineWidth = 3;
-      for (let i = 0; i < 4; i++) for (const sd of [-1, 1]) {
-        const ph = Math.sin(t + i) * 4;
-        cx.beginPath(); cx.moveTo(o.x + sd * 4, o.y - 12); cx.lineTo(o.x + sd * (16 + i * 2), o.y - 22 + i * 3 + ph); cx.lineTo(o.x + sd * (24 + i * 3), o.y + 12 + (ph > 0 ? 0 : -2)); cx.stroke();
-      }
-      cx.fillStyle = '#5a2d82'; cx.beginPath(); cx.ellipse(o.x + 6, o.y - 12, 15, 11, 0, 0, 7); cx.fill(); cx.stroke();
-      cx.fillStyle = '#7a3da8'; cx.beginPath(); cx.arc(o.x - 10, o.y - 12, 8, 0, 7); cx.fill(); cx.stroke();
-      cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(o.x - 13, o.y - 14, 2.6, 0, 7); cx.arc(o.x - 7, o.y - 14, 2.6, 0, 7); cx.fill();
-      cx.fillStyle = '#e5483b'; cx.beginPath(); cx.arc(o.x - 13, o.y - 14, 1.2, 0, 7); cx.arc(o.x - 7, o.y - 14, 1.2, 0, 7); cx.fill();
+    } else if (o.k === 'lizard') {
+      // lagartija (mira a la izquierda, viene hacia el niño)
+      const t = st.t * 14 + o.ph;
+      cx.strokeStyle = '#1d1a16'; cx.lineWidth = 2.4; cx.lineCap = 'round';
+      for (const [dx, ph] of [[-8, 0], [10, 2.2]]) for (const sd of [0, 1]) { const sw = Math.sin(t + ph + sd * 3) * 5; cx.beginPath(); cx.moveTo(o.x + dx, o.y - 8); cx.lineTo(o.x + dx + sw, o.y - 1); cx.stroke(); }
+      cx.beginPath(); cx.moveTo(o.x + 18, o.y - 12); cx.quadraticCurveTo(o.x + 36, o.y - 10 + Math.sin(t * 0.5) * 3, o.x + 46, o.y - 20); cx.lineWidth = 6; cx.strokeStyle = '#1d1a16'; cx.stroke(); cx.lineWidth = 3.6; cx.strokeStyle = '#6a8f3a'; cx.stroke();
+      cx.fillStyle = '#6a8f3a'; cx.strokeStyle = '#1d1a16'; cx.lineWidth = 2.2;
+      cx.beginPath(); cx.ellipse(o.x + 4, o.y - 12, 20, 9, 0, 0, 7); cx.fill(); cx.stroke();
+      cx.beginPath(); cx.ellipse(o.x - 20, o.y - 13, 10, 7.5, -0.1, 0, 7); cx.fill(); cx.stroke();
+      cx.fillStyle = '#c8e07a'; cx.beginPath(); cx.ellipse(o.x + 2, o.y - 16, 12, 3, 0, 0, 7); cx.fill();
+      cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(o.x - 22, o.y - 16, 2.8, 0, 7); cx.fill(); cx.fillStyle = '#111'; cx.beginPath(); cx.arc(o.x - 23, o.y - 16, 1.3, 0, 7); cx.fill();
     }
   }
   function drawPick(p) {
-    if (p.k === 'c') { drawBall(cx, p.x, p.y + Math.sin(st.t * 6 + p.x * 0.05) * 1.5, 11, p.rot); return; }
+    if (p.k === 'c') { Art.copihue(cx, p.x, p.y + Math.sin(st.t * 6 + p.x * 0.05) * 1.5, 1.05, st.t + p.x); return; }
     cx.font = '30px sans-serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
     const e = GIFT_ICON[p.k];
     cx.fillStyle = 'rgba(255,255,255,.55)'; cx.beginPath(); cx.arc(p.x, p.y, 20, 0, 7); cx.fill();

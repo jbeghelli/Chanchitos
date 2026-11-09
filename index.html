@@ -9,8 +9,8 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Chanchitos">
-<title>Chanchitos de tierra</title>
+<meta name="apple-mobile-web-app-title" content="Bichos de Chile">
+<title>Bichos de Chile</title>
 <style>
 :root{
   --verde:#4f9d3a; --verde-osc:#2f5d2a; --tierra:#6b4a2b; --tierra-osc:#3e2a17;
@@ -160,6 +160,36 @@ button{font:inherit;cursor:pointer;border:0;color:inherit}
 .fact button{margin-left:auto;flex:none;width:38px;height:38px;font-size:18px}
 .src{font-size:11px;opacity:.7;text-align:center;padding:4px 12px 14px}
 
+/* selector de niveles, Bichopedia, premio */
+.lvGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.lvTile{position:relative;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:8px;align-items:center;text-align:left;padding:8px 10px;border:4px solid var(--tinta);border-radius:18px;background:#fff;box-shadow:0 4px 0 var(--tinta)}
+.lvTile img{grid-row:1/3;width:44px;height:44px}
+.lvTile img.sil{filter:brightness(0) opacity(.55)}
+.lvTile b{font-size:20px;line-height:1}
+.lvTile small{font-size:11.5px;font-weight:800;line-height:1.1;color:#444}
+.lvTile i{position:absolute;right:6px;top:4px;font-style:normal;font-size:15px}
+.lvTile.done{background:#e3f7d6}
+.lvTile.lock{opacity:.5}
+.reward{display:flex;align-items:center;gap:12px;background:#fff;border:4px solid var(--tinta);border-radius:18px;padding:8px 12px}
+.reward img{width:72px;height:72px;flex:none}
+.reward small{display:block;font-weight:900;color:#d6204a;font-size:12px;letter-spacing:.5px}
+.reward b{display:block;font-size:20px;line-height:1.1}
+.reward i{font-size:13px;color:#555}
+.bcard{flex:none;background:#fff;border:4px solid var(--tinta);border-radius:20px;overflow:hidden}
+.bcard summary{list-style:none;display:flex;align-items:center;gap:10px;padding:8px 12px;cursor:pointer}
+.bcard summary::-webkit-details-marker{display:none}
+.bcard .bi{flex:none;width:52px;height:52px;display:grid;place-items:center;font-size:30px;background:#f4ead0;border-radius:14px}
+.bcard .bi img{width:48px;height:48px}
+.bcard .bt b{display:block;font-size:18px;line-height:1.1}
+.bcard .bt small{display:block;font-size:12.5px;color:#555;margin-top:2px}
+.bcard.lock{opacity:.6;filter:grayscale(.8)}
+.bbody{padding:0 12px 12px;display:flex;flex-direction:column;gap:8px}
+.bbody p{margin:0;font-size:14.5px;line-height:1.35}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips span{background:#e8f6ff;border:2px solid var(--azul);border-radius:12px;padding:2px 8px;font-size:12px;font-weight:800}
+.srcs{font-size:12px!important;line-height:1.4!important;word-break:break-word}
+.srcs a{color:#1a5fa8}
+.slot img{width:36px;height:36px;image-rendering:auto}
 /* toast */
 #toast{position:absolute;left:10px;right:10px;top:max(64px,env(safe-area-inset-top));z-index:50;display:flex;flex-direction:column;gap:8px;pointer-events:none}
 .toast{pointer-events:auto;background:#fff;border:4px solid var(--tinta);border-radius:20px;padding:8px 12px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 5px 0 var(--tinta);
@@ -181,7 +211,7 @@ button{font:inherit;cursor:pointer;border:0;color:inherit}
 
 <!-- ¿QUIÉN JUEGA? -->
 <section id="who" class="screen">
-  <h1>CHANCHITOS<span>de tierra</span></h1>
+  <h1>BICHOS<span>de Chile</span></h1>
   <div class="col">
     <div id="kids" style="display:flex;flex-direction:column;gap:12px"></div>
     <button class="big verde" id="bNewKid">➕ NUEVO NIÑO</button>
@@ -193,16 +223,16 @@ button{font:inherit;cursor:pointer;border:0;color:inherit}
 <!-- MENU -->
 <section id="menu" class="screen">
   <div class="menubar"><button class="round" id="bMute" title="Sonido">🔊</button></div>
-  <h1>CHANCHITOS<span>de tierra</span></h1>
+  <h1>BICHOS<span>de Chile</span></h1>
   <canvas id="menukid"></canvas>
   <button id="hello" class="chip"></button>
   <div class="col">
-    <button class="big verde" id="bRun">🏃 ¡A CORRER!<small id="runSub">gana un chanchito al llegar a la meta</small></button>
-    <button class="big azul" id="bTerr">🏡 MI TERRARIO<small id="colSub">cuida tu colonia</small></button>
+    <button class="big verde" id="bRun">🏃 ¡A CORRER!<small id="runSub">cada meta te da un bicho</small></button>
+    <button class="big azul" id="bTerr">🏡 MI TERRARIO<small id="colSub">cuida a tus bichos</small></button>
     <button class="big" id="bFace">📸 MI CARA<small>pon tu foto al personaje</small></button>
-    <button class="big gris" id="bEnc">📖 CHANCICLOPEDIA<small id="encSub">aprende del bicho</small></button>
+    <button class="big gris" id="bEnc">📖 BICHOPEDIA<small id="encSub">aprende de cada bicho</small></button>
   </div>
-  <div class="foot">Los chanchitos de tierra (<i>Armadillidium vulgare</i>) no son insectos: son crustáceos. ¡Aprende cuidándolos!</div>
+  <div class="foot">Diez bichos clásicos de Chile: gana uno en cada nivel y cuídalos en tu terrario. ¡Aprende de cada uno!</div>
 </section>
 
 <!-- CORRER -->
@@ -241,7 +271,7 @@ button{font:inherit;cursor:pointer;border:0;color:inherit}
     <div class="chip" id="tCount">🐛 0</div>
     <div class="sp"></div>
     <button class="round" id="tSpeed" title="Velocidad">⏩</button>
-    <button class="round" id="tEnc" title="Chanciclopedia">📖</button>
+    <button class="round" id="tEnc" title="Bichopedia">📖</button>
   </div>
   <div id="twrap">
     <canvas id="tc"></canvas>
@@ -274,10 +304,12 @@ button{font:inherit;cursor:pointer;border:0;color:inherit}
 
 <!-- CHANCICLOPEDIA -->
 <section id="enc" class="screen hidden">
-  <div class="head"><button class="round" id="eBack">⬅</button><h2>📖 Chanciclopedia</h2></div>
+  <div class="head"><button class="round" id="eBack">⬅</button><h2>📖 Bichopedia</h2></div>
   <div id="enclist"></div>
 </section>
 
+<div id="lvOv" class="overlay hidden"><div class="card"><h2>¿Qué nivel?</h2><p style="text-align:center;font-size:14px">Cada nivel te da un bicho distinto. ¡Los ya ganados se pueden repetir para tener más!</p>
+  <div id="lvGrid" class="lvGrid"></div><button class="big gris" id="lvClose">VOLVER</button></div></div>
 <div id="optOv" class="overlay hidden"><div class="card"><h2>⚙️ Opciones</h2><div id="optList" style="display:flex;flex-direction:column;gap:10px"></div>
   <button class="big rojo" id="bResetAll">🗑 BORRAR TODO</button><p style="font-size:14px;text-align:center">«Borrar todo» elimina a todos los niños, sus fotos y su progreso.</p>
   <button class="big verde" id="bOptClose">CERRAR</button></div></div>
@@ -286,9 +318,11 @@ button{font:inherit;cursor:pointer;border:0;color:inherit}
 <div id="toast"></div>
 </div>
 
-<script src="core.js?v=6"></script>
-<script src="runner.js?v=6"></script>
-<script src="terrario.js?v=6"></script>
-<script src="boot.js?v=6"></script>
+<script src="data.js?v=7"></script>
+<script src="art.js?v=7"></script>
+<script src="core.js?v=7"></script>
+<script src="runner.js?v=7"></script>
+<script src="terrario.js?v=7"></script>
+<script src="boot.js?v=7"></script>
 </body>
 </html>
